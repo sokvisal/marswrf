@@ -59,7 +59,8 @@ def misc(filename, data): # miscellaneous
     
 def init_reduction(filedir):
     
-    filepath = filedir + '/wrfout_d01*'
+    filepath = filedir + '/wrfout_d01_0001*'
+    print filepath
     if not os.path.exists(filedir+'/reduction'): os.mkdir(filedir+'/reduction')
 #    print filedir
     
@@ -74,7 +75,7 @@ def init_reduction(filedir):
         misc(filedir, data)
         
         
-init_reduction('./test_data')
+init_reduction('./../mars/planetWRF-dev-new/WRFV3/test/em_global_mars/')
  
 def find_ls_idx(ls_arr, ls):
     idx = (np.abs(ls_arr-ls)).argmin() # finding index corresponding to wanted solar long
