@@ -2,26 +2,18 @@ import numpy as np
 from netCDF4 import Dataset
 import matplotlib
 import matplotlib.pylab as plt
+import os
+import glob
 
 matplotlib.rcParams.update({'font.size': 9})
 
-def find_ls_idx(ls_arr, ls):
-    idx = (np.abs(ls_arr-ls)).argmin() # finding index corresponding to wanted solar long
-    assert np.min(np.abs(ls_arr-ls)) < 1, 'Solar Longitude {} not in the file'.format(ls)
-    return idx
-
-def temperature_level(filename, ls1):
+def tp(filename, data): # temperature and pressure
     ### ls1, ls2 - solar longitude 1, 2 ###
     
-    nc_file = filename
-    data = Dataset(nc_file, mode='r')
-    
     t = data.variables['T'][:] # perturbation potential temp
+    
     p = data.variables['P'][:] # perturbation pressure
     pb = data.variables['PB'][:] # base state pressure
-    ls = data.variables['L_S'][:] # solar longitude
-    
-    idx = find_ls_idx(ls, ls1)
 
     t0 = 300. #data.variables['T00'][:] # base temperature
     p0 = 610. #data.variables['P00'][:] # base pressure
@@ -35,10 +27,59 @@ def temperature_level(filename, ls1):
     
     temp = pot_temp*(press/p0)**gamma # temperature
     
-    temp_avg = temp[idx] # avg in long
-    press_avg = press.mean(axis = 3).mean(axis = 2)[idx] # avg in lat, long
+    temp = temp.mean(axis = 3) # avg in long
+    press = press.mean(axis = 3) # avg in long
     
-    return temp_avg, press_avg
+    filename1 = filename + '_t'
+    np.save(filename1, temp)
+    
+    filename2 = filename + '_p'
+    np.save(filename2, press)
+    
+def misc(filename, data): # miscellaneous
+    
+    ls = data.variables['L_S'][:] # solar long
+    u = data.variables['U'][:] # zonal wind
+    ph = data.variables['PH'][:] # perturbation geopot height
+    phb = data.variables['PHB'][:] # base state geopot height
+    
+    geo_height = ph + phb
+    geo_height = geo_height.mean(axis = 3)
+
+    u = u.mean(axis = 3)
+
+    filename1 = filename + '_ls'
+    np.save(filename1, ls)
+    
+    filename2 = filename +'_u'
+    np.save(filename2, u) 
+
+    filename3 = filename + '_p'
+    np.save(filename3, geo_height)
+    
+def init_reduction(filedir):
+    
+    filepath = filedir + '/wrfout_d01*'
+    if not os.path.exists(filedir+'/reduction'): os.mkdir(filedir+'/reduction')
+#    print filedir
+    
+    for i in sorted(glob.glob(filepath)):
+        print i
+        nc_file = i
+        data = Dataset(nc_file, mode='r')
+        
+        filedir = i.replace('wrfout','reduction/wrfout')
+        
+        tp(filedir, data)
+        misc(filedir, data)
+        
+        
+init_reduction('./test_data')
+ 
+def find_ls_idx(ls_arr, ls):
+    idx = (np.abs(ls_arr-ls)).argmin() # finding index corresponding to wanted solar long
+    assert np.min(np.abs(ls_arr-ls)) < 1, 'Solar Longitude {} not in the file'.format(ls)
+    return idx
 
 def zonal_temperature(filename, ls1, ls2):
     ### ls1, ls2 - solar longitude 1, 2 ###
@@ -113,48 +154,3 @@ def net_hr_aer(filename, ls1, ls2):
     
     return net_ir, press_avg
     
-    
-#ls1, ls2 = 315,335 # range of the two solar longitudes we want to look at
-#temp_avg, press_avg, h = zonal_temperature('./test_data/wrfout_d01_0002_00582', ls1, ls2)
-#u_avg = zonal_wind('./test_data/wrfout_d01_0002_00582', ls1, ls2)
-#
-#lat = np.linspace(-90,90,36) # latitude
-#xlong = np.linspace(0,360,72)
-#lat, press = np.meshgrid(lat, press_avg)
-#
-#
-#fig = plt.subplots(figsize=(14, 4))
-#plt.subplot(1,2,1)
-#ax1 = plt.contourf(lat, press, temp_avg, 11, cmap = 'viridis', origin='upper')
-##plt.clabel(ax1, color='k')
-#ax2 = plt.contour(lat, press, temp_avg, 11, colors='black')
-#plt.clabel(ax2, color='k', inline = 1, fmt='%1i')
-#plt.xlabel('Latitude (degree)')
-#plt.ylabel('Pressure (Pa)')
-#plt.title('Avg Zonal Temperature LS {}-{}'.format(ls1, ls2))
-#plt.gca().invert_yaxis()
-#plt.yscale('log')
-##
-##ax2 = plt.twinx()
-##ax2.set_yticks(h)
-##ax2.set_yscale('log')
-##ax2.set_ylabel('Height (km)')
-#plt.show()
-
-
-#plt.subplot(1,2,2)
-#ax1 = plt.contourf(lat, press, u_avg, 11, cmap = 'magma', origin='upper')
-#ax2 = plt.contour(lat, press, u_avg, 11, colors='black')
-#plt.clabel(ax2, color='k', inline = 1, fmt='%1i')
-##plt.colorbar(ax1)
-#plt.xlabel('Latitude (degree)')
-#plt.ylabel('Pressure (Pa)')
-#plt.title('Avg Zonal Wind LS {}-{}'.format(ls1, ls2))
-#plt.gca().invert_yaxis()
-#plt.yscale('log')
-#plt.show()
-
-
-
-
-
