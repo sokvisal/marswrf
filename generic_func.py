@@ -1,27 +1,64 @@
 import numpy as np
 from netCDF4 import Dataset
 import matplotlib
+matplotlib.use('Agg')
+import matplotlib
 import matplotlib.pylab as plt
+import os
+import glob
+import sys
 
 matplotlib.rcParams.update({'font.size': 9})
 
-def find_ls_idx(ls_arr, ls):
-    idx = (np.abs(ls_arr-ls)).argmin() # finding index corresponding to wanted solar long
-    assert np.min(np.abs(ls_arr-ls)) < 1, 'Solar Longitude {} not in the file'.format(ls)
-    return idx
+def name(**variable): 
+    return [x for x in variable][0]
 
-def temperature_level(filename, ls1):
-    ### ls1, ls2 - solar longitude 1, 2 ###
-    
-    nc_file = filename
-    data = Dataset(nc_file, mode='r')
+def load_temp(filename, data):
+    t0 = 300. #data.variables['T00'][:] # base temperature
+    p0 = 610. #data.variables['P00'][:] # base pressure
+    r_d = 191.8366
+    cp = 767.3466
+    g = 3.727
+    gamma = r_d/cp
     
     t = data.variables['T'][:] # perturbation potential temp
+    
     p = data.variables['P'][:] # perturbation pressure
     pb = data.variables['PB'][:] # base state pressure
-    ls = data.variables['L_S'][:] # solar longitude
     
-    idx = find_ls_idx(ls, ls1)
+    ls = data.variables['L_S'][:] # solar long
+    ph = data.variables['PH'][:] # perturbation geopot height
+    phb = data.variables['PHB'][:] # base state geopot height
+    
+    pot_temp = t + t0 # potential temperature
+    press = p + pb # pressure
+    geo_height = ph + phb
+    geo_height = geo_height.mean(axis = 3)
+    
+    temp = pot_temp*(press/p0)**gamma # temperature
+    
+    temp = temp.mean(axis = 3) # avg in long
+    press = press.mean(axis = 3) # avg in long
+    
+    return ls, temp, press, geo_height
+
+def load_misc(filename, data, var_name):
+    var = var_name + '_AM'
+    t_am = data.variables[var][:] # solar long
+    
+    var2 = var_name + '_PM'
+    t_pm = data.variables[var2][:] # solar long
+    
+    return t_am, t_pm
+    
+    
+def tp(filename, data): # temperature and pressure
+    ### ls1, ls2 - solar longitude 1, 2 ###
+    
+    t = data.variables['T'][:] # perturbation potential temp
+    
+    p = data.variables['P'][:] # perturbation pressure
+    pb = data.variables['PB'][:] # base state pressure
 
     t0 = 300. #data.variables['T00'][:] # base temperature
     p0 = 610. #data.variables['P00'][:] # base pressure
@@ -35,14 +72,214 @@ def temperature_level(filename, ls1):
     
     temp = pot_temp*(press/p0)**gamma # temperature
     
-    temp_avg = temp[idx] # avg in long
-    press_avg = press.mean(axis = 3).mean(axis = 2)[idx] # avg in lat, long
+    temp = temp.mean(axis = 3) # avg in long
+    press = press.mean(axis = 3) # avg in long
     
-    return temp_avg, press_avg
+    filename1 = filename + '_t'
+    np.save(filename1, temp)
+    
+    filename2 = filename + '_p'
+    np.save(filename2, press)
+    
+def misc(filename, data): # miscellaneous
+    
+    ls = data.variables['L_S'][:] # solar long
+    u = data.variables['U'][:] # zonal wind
+    ph = data.variables['PH'][:] # perturbation geopot height
+    phb = data.variables['PHB'][:] # base state geopot height
+    
+    geo_height = ph + phb
+    geo_height = geo_height.mean(axis = 3)
 
-def zonal_temperature(filename, ls1, ls2):
+    u = u.mean(axis = 3)
+
+    filename1 = filename + '_ls'
+    np.save(filename1, ls)
+    
+    filename2 = filename +'_u'
+    np.save(filename2, u) 
+
+    filename3 = filename + '_p'
+    np.save(filename3, geo_height)
+    
+def init_reduction(filedir):
+    
+<<<<<<< HEAD
+    var_name = str(sys.argv[1])
+    
+    filepath = filedir + '/wrfout_d01*'
+=======
+    filepath = filedir + '/wrfout_d01_0001*'
+    print filepath
+>>>>>>> 6c6c5441ce6a7abaea0920cfe76f8b265d69a45f
+    if not os.path.exists(filedir+'/reduction'): os.mkdir(filedir+'/reduction')
+#    print filedir
+    
+    for num, i in enumerate(sorted(glob.glob(filepath))):
+        print i
+        if num == 0:
+            nc_file = i
+            data = Dataset(nc_file, mode='r')
+            
+            filedir = i.replace('wrfout','reduction/wrfout')
+            ls, temp, press, geoH = load_temp(filedir, data)
+        else:
+            nc_file = i
+            data = Dataset(nc_file, mode='r')
+            
+            filedir = i.replace('wrfout','reduction/wrfout')
+            ls2, temp2, press2, geoH2 = load_temp(filedir, data)
+            
+            ls = np.concatenate((ls, ls2),axis=0)
+            temp = np.concatenate((temp, temp2),axis=0)
+            press = np.concatenate((press, press2),axis=0)
+            geoH = np.concatenate((geoH, geoH2),axis=0)
+        
+    var_list = ['ls','temp','press','geoH']
+    for num, i in enumerate([ls,temp,press,geoH]):
+        np.save('./test_data/reduction/output_' + var_list[num], i)
+    
+    if var_name:
+        filepath2 = filedir + '/auxhist9*'
+        for num, i in enumerate(sorted(glob.glob(filepath2))):
+            if num == 0:
+                nc_file = i
+                data = Dataset(nc_file, mode='r')
+                
+                filedir = i.replace('auxhist9','reduction/auxhist9')
+                t_am, t_pm = load_misc(filedir, data, var_name)
+            else: 
+                nc_file = i
+                data = Dataset(nc_file, mode='r')
+                
+                filedir = i.replace('auxhist9','reduction/auxhist9')
+                t_am2, t_pm2 = load_misc(filedir, data, var_name)
+                t_am = np.concatenate((t_am, t_am2),axis=0)
+                t_pm = np.concatenate((t_pm, t_pm2),axis=0)
+                
+        var_list = ['t_am','t_pm']
+        for num, i in enumerate([t_am,t_pm]):
+            np.save('./test_data/reduction/output_' + var_list[num], i)
+        
+        
+init_reduction('./../mars/planetWRF-dev-new/WRFV3/test/em_global_mars/')
+ 
+def find_ls_idx(ls_arr, ls):
+    idx = (np.abs(ls_arr-ls)).argmin() # finding index corresponding to wanted solar long
+    assert np.min(np.abs(ls_arr-ls)) < 1, 'Solar Longitude {} not in the file'.format(ls)
+    return idx
+
+
+def zonal_temperature(filedir, month, ls2):
     ### ls1, ls2 - solar longitude 1, 2 ###
     
+    filepath = filedir + '*_t.npy'
+    print filepath
+    temp = np.empty([1,52,36])
+    for i in glob.glob(filepath):
+        print temp.shape
+        temp = np.concatenate((temp, np.load(i)), axis=0)
+    temp = temp[1:]
+    
+    filepath = filedir + '*_u.npy'
+    print filepath
+    u = np.empty([1,52,36])
+    for i in glob.glob(filepath):
+        u = np.concatenate((u, np.load(i)), axis=0)
+    u = u[1:]
+    
+    filepath = filedir + '*_p.npy'
+    print filepath
+    p = np.empty([1,52,36])
+    for i in glob.glob(filepath):
+        print i
+        p = np.concatenate((p, np.load(i)), axis=0)
+    p = p[1:]
+    print filedir+'*_am'
+    
+    if sorted(glob.glob(filedir+'*_am.npy')) or sorted(glob.glob(filedir+'*_am.npy')):
+        print 'Looking at thermal tides'
+        
+        filepath = filedir + '*_t_am.npy'
+        t_am = np.empty([1,52,36])
+        for i in sorted(glob.glob(filepath)):
+            t_am = np.concatenate((t_am, np.load(i)), axis=0)
+        t_am = t_am[1:][::2]
+        
+        filepath = filedir + '*_t_pm.npy'
+        t_pm = np.empty([1,52,36])
+        for i in sorted(glob.glob(filepath)):
+            t_pm = np.concatenate((t_pm, np.load(i)), axis=0)
+        t_pm = t_pm[1:][2::2]
+        
+    filepath = filedir + '*_ls.npy'
+    ls = []
+    for i in glob.glob(filepath):
+        ls = np.concatenate((ls, np.load(i)), axis=0)
+    
+    print np.where(ls ==360)
+    idx = np.where(ls ==360)[0][1] # only looking at the second year
+    ls = ls[idx:]
+    temp = temp[idx:]
+    u = u[idx:]
+    p = p[idx:]
+    
+    zonal_t = []
+    zonal_u = []
+    zonal_p = []
+    zonal_t_am, zonal_t_pm = [], []
+    for i in np.arange(0, 12):
+        idx = np.where((ls>i*30)&(ls<(i+1)*30))
+        zonal_t.append(temp[idx].mean(axis=0))
+        zonal_u.append(u[idx].mean(axis=0))
+        zonal_p.append(p[idx].mean(axis=0))
+        zonal_t_am.append(t_am[idx].mean(axis=0))
+        zonal_t_pm.append(t_pm[idx].mean(axis=0))
+    del temp,u,p
+    zonal_t_am = np.array(zonal_t_am)
+    zonal_t_pm = np.array(zonal_t_pm)
+    zonal_t = np.array(zonal_t)
+    zonal_u = np.array(zonal_u)
+    zonal_p = np.array(zonal_p)
+    print zonal_t.shape, zonal_p.shape
+#    
+    lat = np.linspace(-90,90,36) # latitude
+    press = zonal_p.mean(axis=2).mean(axis=0)
+    lat, press = np.meshgrid(lat, press)
+    print lat.shape, press.shape
+    
+    print 'Plotting zonal temp' 
+    fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(20,14))
+    for i, ax in enumerate(axes.flat):
+#        plt.subplot(4,3,i)
+        temp = (zonal_t_pm[i-1] - zonal_t_am[i-1])/2.
+        #temp = zonal_t[i-1]
+        im = ax.contourf(lat, press, temp, cmap='viridis')
+        ax.contour(lat, press, temp, linewidths=0.5, colors='black')
+        ax.set_title(r'Avg Zonal T$_d$ LS {}-{}'.format((i)*30, (i+1)*30))
+        ax.invert_yaxis()
+        ax.set_yscale('log')
+        
+    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
+    plt.savefig('test.png',bbox_inches='tight', dpi=600)
+    
+#    print 'Plotting zonal wind' 
+#    fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(20,14))
+#    for i, ax in enumerate(axes.flat):
+#        u = zonal_u[i-1]
+#        im = ax.contourf(lat, press, u, cmap='inferno')
+#        ax.contour(lat, press, u, linewidths=0.5, colors='black')
+#        ax.set_title('Avg Zonal Wind LS {}-{}'.format((i)*30, (i+1)*30))
+#        ax.invert_yaxis()
+#        ax.set_yscale('log')
+        
+#    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
+#    plt.savefig('test2.png',bbox_inches='tight', dpi=600)
+    
+    
+#zonal_temperature('./test_data/reduction_mcd_kdm/',12,2)
+
+def zonal_temperature2(filename, ls1, ls2):
     nc_file = filename
     data = Dataset(nc_file, mode='r')
     
@@ -113,48 +350,3 @@ def net_hr_aer(filename, ls1, ls2):
     
     return net_ir, press_avg
     
-    
-#ls1, ls2 = 315,335 # range of the two solar longitudes we want to look at
-#temp_avg, press_avg, h = zonal_temperature('./test_data/wrfout_d01_0002_00582', ls1, ls2)
-#u_avg = zonal_wind('./test_data/wrfout_d01_0002_00582', ls1, ls2)
-#
-#lat = np.linspace(-90,90,36) # latitude
-#xlong = np.linspace(0,360,72)
-#lat, press = np.meshgrid(lat, press_avg)
-#
-#
-#fig = plt.subplots(figsize=(14, 4))
-#plt.subplot(1,2,1)
-#ax1 = plt.contourf(lat, press, temp_avg, 11, cmap = 'viridis', origin='upper')
-##plt.clabel(ax1, color='k')
-#ax2 = plt.contour(lat, press, temp_avg, 11, colors='black')
-#plt.clabel(ax2, color='k', inline = 1, fmt='%1i')
-#plt.xlabel('Latitude (degree)')
-#plt.ylabel('Pressure (Pa)')
-#plt.title('Avg Zonal Temperature LS {}-{}'.format(ls1, ls2))
-#plt.gca().invert_yaxis()
-#plt.yscale('log')
-##
-##ax2 = plt.twinx()
-##ax2.set_yticks(h)
-##ax2.set_yscale('log')
-##ax2.set_ylabel('Height (km)')
-#plt.show()
-
-
-#plt.subplot(1,2,2)
-#ax1 = plt.contourf(lat, press, u_avg, 11, cmap = 'magma', origin='upper')
-#ax2 = plt.contour(lat, press, u_avg, 11, colors='black')
-#plt.clabel(ax2, color='k', inline = 1, fmt='%1i')
-##plt.colorbar(ax1)
-#plt.xlabel('Latitude (degree)')
-#plt.ylabel('Pressure (Pa)')
-#plt.title('Avg Zonal Wind LS {}-{}'.format(ls1, ls2))
-#plt.gca().invert_yaxis()
-#plt.yscale('log')
-#plt.show()
-
-
-
-
-
