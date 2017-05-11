@@ -1,12 +1,18 @@
 import numpy as np
 from netCDF4 import Dataset
+import scipy.ndimage 
+from scipy.interpolate import griddata
+import dwell.fft as fft
 import matplotlib
 matplotlib.use('Agg')
-import matplotlib
+#import matplotlib
 import matplotlib.pylab as plt
+import matplotlib.colors as colors
+import matplotlib.tri as tri
 import os
 import glob
 import sys
+import tarfile
 
 matplotlib.rcParams.update({'font.size': 9})
 
@@ -30,6 +36,8 @@ def load_temp(filename, data):
     ph = data.variables['PH'][:] # perturbation geopot height
     phb = data.variables['PHB'][:] # base state geopot height
     
+    u = data.variables['U'][:] # zonal wind
+    
     pot_temp = t + t0 # potential temperature
     press = p + pb # pressure
     geo_height = ph + phb
@@ -39,8 +47,9 @@ def load_temp(filename, data):
     
     temp = temp.mean(axis = 3) # avg in long
     press = press.mean(axis = 3) # avg in long
+    u = u.mean(axis = 3) # avg in long
     
-    return ls, temp, press, geo_height
+    return ls, temp, press, geo_height, u
 
 def load_misc(filename, data, var_name):
     var = var_name + '_PHY_AM'
@@ -113,184 +122,179 @@ def misc(filename, data): # miscellaneous
 def init_reduction(filedir):
     arg = sys.argv[1]
     def wrfout():
-	    filepath = filedir + '/wrfout_d01*'
-	    print filepath
-	    if not os.path.exists(filedir+'/reduction'): os.mkdir(filedir+'/reduction')
+        filepath = filedir + '/wrfout_d01*'
+        print (filepath)
+        
+        tar = tarfile.open(filedir+'/reduction.tar.gz', 'w:gz')
+        if not os.path.exists(filedir+'/reduction'): 
+            os.mkdir(filedir+'/reduction')
 	#    print filedir
 	    
-	    for num, i in enumerate(sorted(glob.glob(filepath))):
-		print i
-		if num == 0:
-		    nc_file = i
-		    data = Dataset(nc_file, mode='r')
+        for num, i in enumerate(sorted(glob.glob(filepath))):                                                                                                                          
+            if num == 0:
+                nc_file = i
+                data = Dataset(nc_file, mode='r')
+                
+                ls, temp, press, geoH, u = load_temp(nc_file, data)
+            else:
+                nc_file = i
+                data = Dataset(nc_file, mode='r')
 		    
-		    ls, temp, press, geoH = load_temp(nc_file, data)
-		else:
-		    nc_file = i
-		    data = Dataset(nc_file, mode='r')
+                ls2, temp2, press2, geoH2, u2 = load_temp(nc_file, data)
 		    
-		    ls2, temp2, press2, geoH2 = load_temp(nc_file, data)
-		    
-		    ls = np.concatenate((ls, ls2),axis=0)
-		    temp = np.concatenate((temp, temp2),axis=0)
-		    press = np.concatenate((press, press2),axis=0)
-		    geoH = np.concatenate((geoH, geoH2),axis=0)
+                ls = np.concatenate((ls, ls2),axis=0)
+                temp = np.concatenate((temp, temp2),axis=0)
+                press = np.concatenate((press, press2),axis=0)
+                geoH = np.concatenate((geoH, geoH2),axis=0)
+                u = np.concatenate((u, u2),axis=0)
 	    
-	    filedir2 = i.replace('wrfout','reduction/wrfout')
-	    var_list = ['_ls','_temp','_press','_geoH']
-	    for num, i in enumerate([ls,temp,press,geoH]):
-        	np.save(filedir2 + var_list[num], i)
+        filedir2 = i.replace('wrfout','reduction/wrfout')
+        var_list = ['_ls','_temp','_press','_geoH', '_u']
+        for num, i in enumerate([ls,temp,press,geoH,u]):
+            np.save(filedir2 + var_list[num], i)
+            tar.add(filedir2)
+        tar.close()
     
     def auxhist9():
-	print 'hi'  
-	print 'cool'
-	filepath2 = filedir + '/auxhist9*'
-	print filepath2
-	for num, i in enumerate(sorted(glob.glob(filepath2))):
-	    print i
-	    if num == 0:
-		nc_file = i
-		data = Dataset(nc_file, mode='r')
+        print ('hi')  
+        print ('cool')
+        filepath2 = filedir + '/auxhist9*'
+        print (filepath2)
+        
+        tar = tarfile.open(filedir+'/reduction.tar.gz', 'w:gz')
+        for num, i in enumerate(sorted(glob.glob(filepath2))):
+            print (i)
+            if num == 0:
+                nc_file = i
+                data = Dataset(nc_file, mode='r')
 		
-		t_d, t_d_2Pa = load_misc(nc_file, data, 'T' )
-	    else: 
-		nc_file = i
-		data = Dataset(nc_file, mode='r')
+                t_d, t_d_2Pa = load_misc(nc_file, data, 'T' )
+            else: 
+                nc_file = i
+                data = Dataset(nc_file, mode='r')
 		
-		t_d2, t_d2_2Pa = load_misc(nc_file, data, 'T')
-		t_d = np.concatenate((t_d, t_d2),axis=0)
-		t_d_2Pa = np.concatenate((t_d_2Pa, t_d2_2Pa),axis=0)
+                t_d2, t_d2_2Pa = load_misc(nc_file, data, 'T')
+                t_d = np.concatenate((t_d, t_d2),axis=0)
+                t_d_2Pa = np.concatenate((t_d_2Pa, t_d2_2Pa),axis=0)
 	
-	filedir3 = i.replace('auxhist9','reduction/wrfout')        
-	var_list = ['_t_d','_t_d_2Pa']
-	for num, i in enumerate([t_d,t_d_2Pa]):
-	    np.save(filedir3 + var_list[num], i)
+        filedir3 = i.replace('auxhist9','reduction/wrfout')        
+        var_list = ['_t_d','_t_d_2Pa']
+        for num, i in enumerate([t_d,t_d_2Pa]):
+            np.save(filedir3 + var_list[num], i)
+            tar.add(filedir3)
+        tar.close()
  
     def auxhist5():    
-	filepath2 = filedir+'/auxhist5*'
-	for num, i in enumerate(sorted(glob.glob(filepath2))):
-	    print i
-	    if num == 0:
-		nc_file = i
-		data = Dataset(nc_file, mode='r')
+        filepath2 = filedir+'/auxhist5*'
+        
+        tar = tarfile.open(filedir+'/reduction.tar.gz', 'w:gz')
+        for num, i in enumerate(sorted(glob.glob(filepath2))):
+            print (i)
+            if num == 0:
+                nc_file = i
+                data = Dataset(nc_file, mode='r')
 
-		psfc, ls_psfc = load_misc3D(nc_file, data, 'PSFC' )
-	    else:
-		nc_file = i
-		data = Dataset(nc_file, mode='r')
+                psfc, ls_psfc = load_misc3D(nc_file, data, 'PSFC' )
+            else:
+                nc_file = i
+                data = Dataset(nc_file, mode='r')
 
-		psfc2, ls_psfc2 = load_misc3D(nc_file, data, 'PSFC')
-		psfc = np.concatenate((psfc, psfc2),axis=0)
-		ls_psfc2 = np.concatenate((ls_psfc, ls_psfc2),axis=0)
+                psfc2, ls_psfc2 = load_misc3D(nc_file, data, 'PSFC')
+                psfc = np.concatenate((psfc, psfc2),axis=0)
+                ls_psfc2 = np.concatenate((ls_psfc, ls_psfc2),axis=0)
 
-	filedir3 = i.replace('auxhist5','reduction/wrfout')
-	var_list = ['_psfc','_ls_psfc']
-	for num, i in enumerate([psfc,ls_psfc]):
-	    np.save(filedir3 + var_list[num], i) 
+        filedir3 = i.replace('auxhist5','reduction/wrfout')
+        var_list = ['_psfc','_ls_psfc']
+        for num, i in enumerate([psfc,ls_psfc]):
+            np.save(filedir3 + var_list[num], i)
+            tar.add(filedir3)
+        tar.close()
 
     if arg == 'wrfout': return wrfout()
     if arg == 'auxhist9': return auxhist9()
     if arg == 'auxhist5': return auxhist5()
-init_reduction('./../planetWRF/WRFV3/run/new_wbm')
-	 
+#init_reduction('./../planetWRF/WRFV3/run/new_wbm')
+ 
 def find_ls_idx(ls_arr, ls):
     idx = (np.abs(ls_arr-ls)).argmin() # finding index corresponding to wanted solar long
     assert np.min(np.abs(ls_arr-ls)) < 1, 'Solar Longitude {} not in the file'.format(ls)
     return idx
 
 
-def zonal_temperature(filedir, month, ls2):
+def zonal_avg(filedir, month, ls2):
+    print ('Looking at zonal avg')
     ### ls1, ls2 - solar longitude 1, 2 ###
     
-    filepath = filedir + '*_t.npy'
-    print filepath
-    temp = np.empty([1,52,36])
-    for i in glob.glob(filepath):
-        print temp.shape
-        temp = np.concatenate((temp, np.load(i)), axis=0)
-    temp = temp[1:]
+    filepath = glob.glob(filedir + '*_temp.npy')[0]
+    print (filepath)
+    temp = np.load(filepath)
     
-    filepath = filedir + '*_u.npy'
-    print filepath
-    u = np.empty([1,52,36])
-    for i in glob.glob(filepath):
-        u = np.concatenate((u, np.load(i)), axis=0)
-    u = u[1:]
+#    filepath = filedir + '*_u.npy'
+#    print filepath
+#    u = np.load(filepath)
     
-    filepath = filedir + '*_p.npy'
-    print filepath
-    p = np.empty([1,52,36])
-    for i in glob.glob(filepath):
-        print i
-        p = np.concatenate((p, np.load(i)), axis=0)
-    p = p[1:]
-    print filedir+'*_am'
-    
-    if sorted(glob.glob(filedir+'*_am.npy')) or sorted(glob.glob(filedir+'*_am.npy')):
-        print 'Looking at thermal tides'
+    filepath = glob.glob(filedir + '*_press.npy')[0]
+    print (filepath)
+    p = np.load(filepath)
         
-        filepath = filedir + '*_t_am.npy'
-        t_am = np.empty([1,52,36])
-        for i in sorted(glob.glob(filepath)):
-            t_am = np.concatenate((t_am, np.load(i)), axis=0)
-        t_am = t_am[1:][::2]
-        
-        filepath = filedir + '*_t_pm.npy'
-        t_pm = np.empty([1,52,36])
-        for i in sorted(glob.glob(filepath)):
-            t_pm = np.concatenate((t_pm, np.load(i)), axis=0)
-        t_pm = t_pm[1:][2::2]
-        
-    filepath = filedir + '*_ls.npy'
-    ls = []
-    for i in glob.glob(filepath):
-        ls = np.concatenate((ls, np.load(i)), axis=0)
+    filepath = glob.glob(filedir + '*_ls.npy')[0]
+    ls = np.load(filepath)[::2]
+
+    idx1 = np.where(ls == 360)[0][1] # only looking at the second year
+    idx2 = np.where(ls == 360)[0][2]
     
-    print np.where(ls ==360)
-    idx = np.where(ls ==360)[0][1] # only looking at the second year
-    ls = ls[idx:]
-    temp = temp[idx:]
-    u = u[idx:]
-    p = p[idx:]
+    ls = ls[idx1:idx2]
+    temp = temp[idx1:idx2]
+#    u = u[idx:]
+    p = p[idx1:idx2]
+    print (ls)
     
     zonal_t = []
-    zonal_u = []
+#    zonal_u = []
     zonal_p = []
-    zonal_t_am, zonal_t_pm = [], []
     for i in np.arange(0, 12):
+        print ('month', i+1)
         idx = np.where((ls>i*30)&(ls<(i+1)*30))
         zonal_t.append(temp[idx].mean(axis=0))
-        zonal_u.append(u[idx].mean(axis=0))
+#        zonal_u.append(u[idx].mean(axis=0))
         zonal_p.append(p[idx].mean(axis=0))
-        zonal_t_am.append(t_am[idx].mean(axis=0))
-        zonal_t_pm.append(t_pm[idx].mean(axis=0))
-    del temp,u,p
-    zonal_t_am = np.array(zonal_t_am)
-    zonal_t_pm = np.array(zonal_t_pm)
+    del temp, p
     zonal_t = np.array(zonal_t)
-    zonal_u = np.array(zonal_u)
+#    zonal_u = np.array(zonal_u)
     zonal_p = np.array(zonal_p)
-    print zonal_t.shape, zonal_p.shape
-#    
-    lat = np.linspace(-90,90,36) # latitude
-    press = zonal_p.mean(axis=2).mean(axis=0)
-    lat, press = np.meshgrid(lat, press)
-    print lat.shape, press.shape
     
-    print 'Plotting zonal temp' 
+    print ('Plotting some cool shit')
     fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(20,14))
     for i, ax in enumerate(axes.flat):
-#        plt.subplot(4,3,i)
-        temp = (zonal_t_pm[i-1] - zonal_t_am[i-1])/2.
-        #temp = zonal_t[i-1]
-        im = ax.contourf(lat, press, temp, cmap='viridis')
-        ax.contour(lat, press, temp, linewidths=0.5, colors='black')
+        press = zonal_p[i-1][4:]
+        
+        #press2 = zonal_p[i-1].mean(axis=1)
+        lat = np.linspace(-90, 90, 36) 
+        temp_press = np.linspace(1e-2, 900, 52)[4:]
+        
+        lat, temp_press = np.meshgrid(lat, temp_press)
+        
+        temp = zonal_t[i-1][4:]
+        print (temp_press.shape, lat.shape, temp.shape)
+#        temp = temp[4:]
+        
+        im = ax.contourf(lat, press, temp, 12, cmap='viridis')
+        ax.contour(lat, press, temp, 12, colors='k')
+        
         ax.set_title(r'Avg Zonal T$_d$ LS {}-{}'.format((i)*30, (i+1)*30))
         ax.invert_yaxis()
         ax.set_yscale('log')
-        
+        ax.set_ylim([900, 1e-2])
+    
+    print ('Saving 1st cool shit')
     fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
-    plt.savefig('test.png',bbox_inches='tight', dpi=600)
+    plt.savefig('zonal_temp.png',bbox_inches='tight', dpi=600)
+    
+    print ('Saving 2nd cool shit')
+    
+#    cb = fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
+#    plt.savefig('test2.png',bbox_inches='tight', dpi=600)
+
     
 #    print 'Plotting zonal wind' 
 #    fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(20,14))
@@ -304,9 +308,117 @@ def zonal_temperature(filedir, month, ls2):
         
 #    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
 #    plt.savefig('test2.png',bbox_inches='tight', dpi=600)
+
+def zonal_diff(filedir, month, ls2):
+    print ('Looking at thermal tides')
+    
+    filepath = glob.glob(filedir + '*_press.npy')[0]
+    print (filepath)
+    p = np.load(filepath)
+        
+    filepath = glob.glob(filedir + '*_t_d.npy')[0]
+    t_d = np.load(filepath)
+    t_d = t_d
+    
+    filepath = glob.glob(filedir + '*_t_d_2Pa.npy')[0]
+    t_d_2Pa = np.load(filepath)
+    t_d_2Pa = t_d_2Pa 
+    
+    filepath = glob.glob(filedir + '*_ls.npy')[0]
+    ls = np.load(filepath)[::2]
+
+    idx1 = np.where(ls == 360)[0][1] # only looking at the second year
+    idx2 = np.where(ls == 360)[0][2]
+    
+    ls = ls[idx1:idx2]
+    t_d = t_d[idx1:idx2]
+    t_d_2Pa = t_d_2Pa[idx1:idx2]
+    p = p[idx1:idx2]
+    
+    print (t_d_2Pa.shape)
+    
+#    test_diff = t_d_2Pa.reshape((223,3,36,72)).mean(axis=1)
+    ampl, phase, axis = fft.spec1d(t_d_2Pa.T, 1/72., use_axes = 0)
+    ampl = ampl.T
+    phase = phase.T
+    print (np.min(ampl))
+#    ampl.hstack(axis=0)
+#    phase.hstack(axis=0)
+    
+    test = np.zeros((669,36))
+    test2 = np.zeros((669,36))
+    for i in np.arange(0,669):
+        test[i] = ampl[i,:,0]
+        test2[i] = phase[i,:,0]
+        
+    lat = np.linspace(-90, 90, 36) 
+    ls = np.linspace(0,360, 669)
+    t_lat, t_ls = np.meshgrid(lat, ls)
+    plt.figure()
+    plt.contourf(t_ls, t_lat, test, cmap='viridis')
+    plt.contour(t_ls, t_lat, test2, colors='k')
+#    plt.colorbar()
+    
+    zonal_p = []
+    zonal_t_d = []
+    zonal_t_2P = []
+    for i in np.arange(0, 12):
+        print ('month', i+1)
+        idx = np.where((ls>i*30)&(ls<(i+1)*30))
+        zonal_p.append(p[idx].mean(axis=0))
+        zonal_t_d.append(t_d[idx].mean(axis=0))
+        zonal_t_2P.append(t_d_2Pa[idx].mean(axis=0))
+    zonal_t_d = np.array(zonal_t_d)
+    zonal_t_2P = np.array(zonal_t_2P)
+    zonal_p = np.array(zonal_p)
+    
+    print ('Plotting some cool shit')
+    fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(20,14))
+    for i, ax in enumerate(axes.flat):
+        press = zonal_p[i-1][4:]
+        
+        #press2 = zonal_p[i-1].mean(axis=1)
+        lat = np.linspace(-90, 90, 36) 
+        temp_press = np.linspace(1e-2, 900, 52)[4:]
+        
+        #lat, press = np.meshgrid(lat, press2[5:])
+        lat, temp_press = np.meshgrid(lat, temp_press)
+        
+        temp = zonal_t_d[i-1][4:]
+        
+        im = ax.contourf(lat, press, temp, 12, cmap='viridis')
+        ax.contour(lat, press, temp, 12, linewidths=0.5, colors='black')
+        
+        ax.set_title(r'Avg Zonal T$_d$ LS {0}-{1}'.format((i)*30, (i+1)*30))
+        ax.invert_yaxis()
+        ax.set_yscale('log')
+        ax.set_ylim([900, 1e-2])
+        
+    print ('Saving 1st cool shit')
+    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
+#    plt.savefig('zonal_tdiff.png',bbox_inches='tight', dpi=600)
+    
+    fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(20,14))
+    for i, ax in enumerate(axes.flat):
+        t_2P = zonal_t_2P[i-1]
+        print(np.fft.fftshift(np.fft.fft(t_2P[18]))[36:]/72.)
+        
+        #press2 = zonal_p[i-1].mean(axis=1)
+        lat = np.linspace(-90, 90, 36) 
+        lon = np.linspace(0, 360, 72)
+        
+        lon, lat = np.meshgrid(lon, lat)
+
+        im = ax.contourf(lon, lat, t_2P, cmap='viridis')
+        ax.contour(lon, lat, t_2P, linewidths=0.5, colors='black')
+        ax.set_title(r'Avg T$_d$ LS {0}-{1} at 2 Pa'.format((i)*30, (i+1)*30))
+        
+    print ('Saving 2nd cool shit')
+    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
+#    plt.savefig('zonal_tdiff_2Pa.png',bbox_inches='tight', dpi=600)
     
     
-#zonal_temperature('./test_data/reduction_mcd_kdm/',12,2)
+zonal_diff('./test_data/reduction/',12,2)
 
 def zonal_temperature2(filename, ls1, ls2):
     nc_file = filename
