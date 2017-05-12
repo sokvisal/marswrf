@@ -103,7 +103,8 @@ def init_reduction(filedir):
         for num, i in enumerate([ls,temp,press,geoH,u]):
             print('Saving', var_list[num])
 	    np.save(filedir2 + var_list[num], i)
-            tar.add(filedir2 + var_list[num] + '.npy')
+            filename = filedir3.replace(filedir, '')
+            tar.add(filedir3 + var_list[num]+'.npy', arcname = filename + var_list[num]+ '.npy')
         tar.close()
     
     def auxhist9():
@@ -132,8 +133,9 @@ def init_reduction(filedir):
         var_list = ['_t_d','_t_d_2Pa']
         for num, i in enumerate([t_d,t_d_2Pa]):
             np.save(filedir3 + var_list[num], i)
-            tar.add(filedir3 + var_list[num] + '.npy')
-        tar.close()
+            filename = filedir3.replace(filedir, '')
+            tar.add(filedir3 + var_list[num]+'.npy', arcname = filename + var_list[num]+ '.npy')
+	tar.close()
  
     def auxhist5():    
         filepath2 = filedir+'/auxhist5*'
@@ -159,7 +161,8 @@ def init_reduction(filedir):
         for num, i in enumerate([psfc,ls_psfc]):
 	    print(psfc.shape)
             np.save(filedir3 + var_list[num], i)
-            tar.add(filedir3 + var_list[num] + '.npy')
+            filename = filedir3.replace(filedir, '')
+            tar.add(filedir3 + var_list[num]+'.npy', arcname = filename + var_list[num]+ '.npy')
         tar.close()
 
     if arg == 'wrfout': return wrfout()
