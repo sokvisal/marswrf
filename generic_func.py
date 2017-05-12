@@ -68,57 +68,6 @@ def load_misc3D(filename, data, var_name):
     ls = data.variables['L_S'][:]
     return temp, ls
     
-    
-def tp(filename, data): # temperature and pressure
-    ### ls1, ls2 - solar longitude 1, 2 ###
-    
-    t = data.variables['T'][:] # perturbation potential temp
-    
-    p = data.variables['P'][:] # perturbation pressure
-    pb = data.variables['PB'][:] # base state pressure
-
-    t0 = 300. #data.variables['T00'][:] # base temperature
-    p0 = 610. #data.variables['P00'][:] # base pressure
-    r_d = 191.8366
-    cp = 767.3466
-    g = 3.727
-    gamma = r_d/cp
-    
-    pot_temp = t + t0 # potential temperature
-    press = p + pb # pressure
-    
-    temp = pot_temp*(press/p0)**gamma # temperature
-    
-    temp = temp.mean(axis = 3) # avg in long
-    press = press.mean(axis = 3) # avg in long
-    
-    filename1 = filename + '_t'
-    np.save(filename1, temp)
-    
-    filename2 = filename + '_p'
-    np.save(filename2, press)
-    
-def misc(filename, data): # miscellaneous
-    
-    ls = data.variables['L_S'][:] # solar long
-    u = data.variables['U'][:] # zonal wind
-    ph = data.variables['PH'][:] # perturbation geopot height
-    phb = data.variables['PHB'][:] # base state geopot height
-    
-    geo_height = ph + phb
-    geo_height = geo_height.mean(axis = 3)
-
-    u = u.mean(axis = 3)
-
-    filename1 = filename + '_ls'
-    np.save(filename1, ls)
-    
-    filename2 = filename +'_u'
-    np.save(filename2, u) 
-
-    filename3 = filename + '_p'
-    np.save(filename3, geo_height)
-    
 def init_reduction(filedir):
     arg = sys.argv[1]
     def wrfout():
@@ -201,7 +150,7 @@ def init_reduction(filedir):
 
                 psfc2, ls_psfc2 = load_misc3D(nc_file, data, 'PSFC')
                 psfc = np.concatenate((psfc, psfc2),axis=0)
-                ls_psfc2 = np.concatenate((ls_psfc, ls_psfc2),axis=0)
+                ls_psfc = np.concatenate((ls_psfc, ls_psfc2),axis=0)
 
         filedir3 = i.replace('auxhist5','reduction/wrfout')
         var_list = ['_psfc','_ls_psfc']
@@ -338,9 +287,9 @@ def zonal_diff(filedir, month, ls2):
     print (t_d_2Pa.shape)
     
 #    test_diff = t_d_2Pa.reshape((223,3,36,72)).mean(axis=1)
-    ampl, phase, axis = fft.spec1d(t_d_2Pa.T, 1/72., use_axes = 0)
-    ampl = ampl.T
-    phase = phase.T
+    ampl, phase, axis = fft.spec1d(t_d_2Pa, 1/72., use_axes = 2)
+    ampl = ampl
+    phase = phase
     print (np.min(ampl))
 #    ampl.hstack(axis=0)
 #    phase.hstack(axis=0)
@@ -356,8 +305,8 @@ def zonal_diff(filedir, month, ls2):
     t_lat, t_ls = np.meshgrid(lat, ls)
     plt.figure()
     plt.contourf(t_ls, t_lat, test, cmap='viridis')
-    plt.contour(t_ls, t_lat, test2, colors='k')
-#    plt.colorbar()
+#    plt.contour(t_ls, t_lat, np.tan(test2), colors='k')
+    plt.colorbar()
     
     zonal_p = []
     zonal_t_d = []
@@ -401,7 +350,6 @@ def zonal_diff(filedir, month, ls2):
     fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(20,14))
     for i, ax in enumerate(axes.flat):
         t_2P = zonal_t_2P[i-1]
-        print(np.fft.fftshift(np.fft.fft(t_2P[18]))[36:]/72.)
         
         #press2 = zonal_p[i-1].mean(axis=1)
         lat = np.linspace(-90, 90, 36) 
@@ -416,9 +364,37 @@ def zonal_diff(filedir, month, ls2):
     print ('Saving 2nd cool shit')
     fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
 #    plt.savefig('zonal_tdiff_2Pa.png',bbox_inches='tight', dpi=600)
+
+#zonal_avg('./test_data/reduction/',12,2)
+#zonal_diff('./test_data/reduction/',12,2)
+
+def fft_hovmoller(filedir):
+    print ('Looking at spectral of surface presssure')
+    
+    filepath = glob.glob(filedir + '*_psfc.npy')[0]
+    print (filepath)
+    psfc = np.load(filepath)
+    
+    filepath = glob.glob(filedir + '*_ls_psfc.npy')[0]
+    print (filepath)
+    ls = np.load(filepath)
+    
+    # avging for specific latitude
+    lat = np.linspace(-90,90,36)
+    idx = np.where((lat>-10)&(lat<10))
+    print (psfc.shape)
+    psfc = psfc[:,idx,:].mean(axis=1)
+    
+    lon = np.linspace(0,360,72)
+    ls, lon = np.meshgrid(ls, lon)
+    
+    plt.figure()
+    plt.contourf(lon, ls, psfc)
+    plt.savefig('hovmoller.png' )
     
     
-zonal_diff('./test_data/reduction/',12,2)
+    
+fft_hovmoller('./test_data/reduction/')
 
 def zonal_temperature2(filename, ls1, ls2):
     nc_file = filename
