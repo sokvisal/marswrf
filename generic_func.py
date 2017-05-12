@@ -2,7 +2,7 @@ import numpy as np
 from netCDF4 import Dataset
 import scipy.ndimage 
 from scipy.interpolate import griddata
-#import dwell.fft as fft
+import dwell.fft as fft
 import matplotlib
 matplotlib.use('Agg')
 #import matplotlib
@@ -389,42 +389,36 @@ def fft_hovmoller(filedir):
     idx2 = np.where(ls == 360)[0][2]
     ls = ls[idx1:idx2]
     psfc = psfc[idx1:idx2]
-    print (ls.shape, psfc.shape)
     
     #avging for specific latitude
     lat = np.linspace(-90,90,36)
     idx = np.where((lat>-10)&(lat<10))[0]
     
     psfc = psfc[:,18,:]#.mean(axis=1)
-    avg = psfc.mean().mean()
-    psfc = psfc/avg
     
     idx = np.where((ls>300)&(ls<320))[0]
     ls = ls[idx]
-    psfc = psfc[idx]
+    psfc = psfc[idx] 
+    psfc = psfc - psfc.mean(axis=0)
 #    
     lon = np.linspace(0,360,72)
     lon, ls = np.meshgrid(lon, ls)
-    print (psfc.shape, lon.shape)
-
-#    lat = np.linspace(-90,90,36)
-#    lon, lat = np.meshgrid(lon, lat)
     
-    plt.figure()
+    plt.figure(figsize=(10,4))
+    plt.subplot(1,2,1)
     plt.contourf(lon, ls, psfc)
-#    plt.savefig('hovmoller.png' )
+    plt.ylabel('Solar Longitude')
+    plt.xlabel('Longitude')
+    plt.title(r'Hovm$\mathrm{\"{o}}$ller Diagram of Surface Pressure')
 
-#    pad = np.zeros((psfc.shape[0]*2, psfc.shape[1]*2))
-#    pad[:psfc.shape[0], :psfc.shape[1]] = psfc
-
-    cycles = np.fft.fftfreq(ls.size)
-    cycles = np.fft.fftshift(cycles)
+    lat = np.linspace(-90,90,36)
     
-    fft = np.fft.fft2(psfc)/psfc.size
-    fft = np.abs(fft)**2
-    fft = np.fft.fftshift(fft)[:,17:].T
-    plt.figure()
-    plt.imshow(np.log10(fft), origin='lower', extent=[cycles[0], cycles[-1], 0, 1])
+    plt.subplot(1,2,2)
+    ampl, phase, cycle, waven = fft.spec(psfc, 1./8, 1./72, axes=[0,1])
+    plt.contourf(cycle, waven[:5], np.log10(ampl).T[:5])
+    plt.ylabel('Wavenumber')
+    plt.xlabel('Cycles/sol')
+    plt.title(r'Amplitude of FFT of Hovm$\mathrm{\"{o}}$ller Diagram')
     
 fft_hovmoller('./test_data/reduction/')
 
