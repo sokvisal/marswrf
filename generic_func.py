@@ -77,11 +77,11 @@ def init_reduction(filedir):
         tar = tarfile.open(filedir+'/reduction.tar.gz', 'w:gz')
         if not os.path.exists(filedir+'/reduction'): 
             os.mkdir(filedir+'/reduction')
-	#    print filedir
-	    
-        for num, i in enumerate(sorted(glob.glob(filepath))):                                                                                                                          
+        	#    print filedir
+        	    
+        for num, i in enumerate(sorted(glob.glob(filepath))):
             print(i)
-	    if num == 0:
+            if num == 0:
                 nc_file = i
                 data = Dataset(nc_file, mode='r')
                 
@@ -89,22 +89,22 @@ def init_reduction(filedir):
             else:
                 nc_file = i
                 data = Dataset(nc_file, mode='r')
-		    
+        		    
                 ls2, temp2, press2, geoH2, u2 = load_temp(nc_file, data)
-		    
+        		    
                 ls = np.concatenate((ls, ls2),axis=0)
                 temp = np.concatenate((temp, temp2),axis=0)
                 press = np.concatenate((press, press2),axis=0)
                 geoH = np.concatenate((geoH, geoH2),axis=0)
                 u = np.concatenate((u, u2),axis=0)
-	    
+        	    
         filedir2 = i.replace('wrfout','reduction/wrfout')
         var_list = ['_ls','_temp','_press','_geoH', '_u']
         for num, i in enumerate([ls,temp,press,geoH,u]):
             print('Saving', var_list[num])
-	    np.save(filedir2 + var_list[num], i)
-            filename = filedir3.replace(filedir, '')
-            tar.add(filedir3 + var_list[num]+'.npy', arcname = filename + var_list[num]+ '.npy')
+            np.save(filedir2 + var_list[num], i)
+            filename = filedir2.replace(filedir, '')
+            tar.add(filedir2 + var_list[num]+'.npy', arcname = filename + var_list[num]+ '.npy')
         tar.close()
     
     def auxhist9():
@@ -135,7 +135,7 @@ def init_reduction(filedir):
             np.save(filedir3 + var_list[num], i)
             filename = filedir3.replace(filedir, '')
             tar.add(filedir3 + var_list[num]+'.npy', arcname = filename + var_list[num]+ '.npy')
-	tar.close()
+        tar.close()
  
     def auxhist5():    
         filepath2 = filedir+'/auxhist5*'
@@ -159,7 +159,7 @@ def init_reduction(filedir):
         filedir3 = i.replace('auxhist5','reduction/wrfout')
         var_list = ['_psfc','_ls_psfc']
         for num, i in enumerate([psfc,ls_psfc]):
-	    print(psfc.shape)
+            print(psfc.shape)
             np.save(filedir3 + var_list[num], i)
             filename = filedir3.replace(filedir, '')
             tar.add(filedir3 + var_list[num]+'.npy', arcname = filename + var_list[num]+ '.npy')
@@ -168,7 +168,7 @@ def init_reduction(filedir):
     if arg == 'wrfout': return wrfout()
     if arg == 'auxhist9': return auxhist9()
     if arg == 'auxhist5': return auxhist5()
-init_reduction('./../planetWRF/WRFV3/run/new_wbm')
+#init_reduction('./../planetWRF/WRFV3/run/new_wbm')
  
 def find_ls_idx(ls_arr, ls):
     idx = (np.abs(ls_arr-ls)).argmin() # finding index corresponding to wanted solar long
@@ -377,7 +377,7 @@ def zonal_diff(filedir, month, ls2):
 def fft_hovmoller(filedir):
     print ('Looking at spectral of surface presssure')
     
-    filepath = glob.glob(filedir + '*_psfc.npy')[0]
+    filepath = glob.glob(filedir + '*0_psfc.npy')[0]
     print (filepath)
     psfc = np.load(filepath)
     
@@ -385,22 +385,48 @@ def fft_hovmoller(filedir):
     print (filepath)
     ls = np.load(filepath)
     
-    # avging for specific latitude
-    lat = np.linspace(-90,90,36)
-    idx = np.where((lat>-10)&(lat<10))
-    print (psfc.shape)
-    psfc = psfc[:,idx,:].mean(axis=1)
+    idx1 = np.where(ls == 360)[0][1] # only looking at the second year
+    idx2 = np.where(ls == 360)[0][2]
+    ls = ls[idx1:idx2]
+    psfc = psfc[idx1:idx2]
+    print (ls.shape, psfc.shape)
     
+    #avging for specific latitude
+    lat = np.linspace(-90,90,36)
+    idx = np.where((lat>-10)&(lat<10))[0]
+    
+    psfc = psfc[:,18,:]#.mean(axis=1)
+    avg = psfc.mean().mean()
+    psfc = psfc/avg
+    
+    idx = np.where((ls>300)&(ls<320))[0]
+    ls = ls[idx]
+    psfc = psfc[idx]
+#    
     lon = np.linspace(0,360,72)
-    ls, lon = np.meshgrid(ls, lon)
+    lon, ls = np.meshgrid(lon, ls)
+    print (psfc.shape, lon.shape)
+
+#    lat = np.linspace(-90,90,36)
+#    lon, lat = np.meshgrid(lon, lat)
     
     plt.figure()
     plt.contourf(lon, ls, psfc)
-    plt.savefig('hovmoller.png' )
+#    plt.savefig('hovmoller.png' )
+
+#    pad = np.zeros((psfc.shape[0]*2, psfc.shape[1]*2))
+#    pad[:psfc.shape[0], :psfc.shape[1]] = psfc
+
+    cycles = np.fft.fftfreq(ls.size)
+    cycles = np.fft.fftshift(cycles)
     
+    fft = np.fft.fft2(psfc)/psfc.size
+    fft = np.abs(fft)**2
+    fft = np.fft.fftshift(fft)[:,17:].T
+    plt.figure()
+    plt.imshow(np.log10(fft), origin='lower', extent=[cycles[0], cycles[-1], 0, 1])
     
-    
-#fft_hovmoller('./test_data/reduction/')
+fft_hovmoller('./test_data/reduction/')
 
 def zonal_temperature2(filename, ls1, ls2):
     nc_file = filename
