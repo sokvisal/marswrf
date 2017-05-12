@@ -2,7 +2,7 @@ import numpy as np
 from netCDF4 import Dataset
 import scipy.ndimage 
 from scipy.interpolate import griddata
-import dwell.fft as fft
+#import dwell.fft as fft
 import matplotlib
 matplotlib.use('Agg')
 #import matplotlib
@@ -80,7 +80,8 @@ def init_reduction(filedir):
 	#    print filedir
 	    
         for num, i in enumerate(sorted(glob.glob(filepath))):                                                                                                                          
-            if num == 0:
+            print(i)
+	    if num == 0:
                 nc_file = i
                 data = Dataset(nc_file, mode='r')
                 
@@ -100,8 +101,9 @@ def init_reduction(filedir):
         filedir2 = i.replace('wrfout','reduction/wrfout')
         var_list = ['_ls','_temp','_press','_geoH', '_u']
         for num, i in enumerate([ls,temp,press,geoH,u]):
-            np.save(filedir2 + var_list[num], i)
-            tar.add(filedir2)
+            print('Saving', var_list[num])
+	    np.save(filedir2 + var_list[num], i)
+            tar.add(filedir2 + var_list[num] + '.npy')
         tar.close()
     
     def auxhist9():
@@ -130,7 +132,7 @@ def init_reduction(filedir):
         var_list = ['_t_d','_t_d_2Pa']
         for num, i in enumerate([t_d,t_d_2Pa]):
             np.save(filedir3 + var_list[num], i)
-            tar.add(filedir3)
+            tar.add(filedir3 + var_list[num] + '.npy')
         tar.close()
  
     def auxhist5():    
@@ -155,14 +157,15 @@ def init_reduction(filedir):
         filedir3 = i.replace('auxhist5','reduction/wrfout')
         var_list = ['_psfc','_ls_psfc']
         for num, i in enumerate([psfc,ls_psfc]):
+	    print(psfc.shape)
             np.save(filedir3 + var_list[num], i)
-            tar.add(filedir3)
+            tar.add(filedir3 + var_list[num] + '.npy')
         tar.close()
 
     if arg == 'wrfout': return wrfout()
     if arg == 'auxhist9': return auxhist9()
     if arg == 'auxhist5': return auxhist5()
-#init_reduction('./../planetWRF/WRFV3/run/new_wbm')
+init_reduction('./../planetWRF/WRFV3/run/new_wbm')
  
 def find_ls_idx(ls_arr, ls):
     idx = (np.abs(ls_arr-ls)).argmin() # finding index corresponding to wanted solar long
@@ -394,7 +397,7 @@ def fft_hovmoller(filedir):
     
     
     
-fft_hovmoller('./test_data/reduction/')
+#fft_hovmoller('./test_data/reduction/')
 
 def zonal_temperature2(filename, ls1, ls2):
     nc_file = filename
