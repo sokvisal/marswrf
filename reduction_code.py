@@ -154,7 +154,7 @@ def init_reduction(filedir):
 	tar = tarfile.open(filedir+'/reduction.tar.gz', 'w:gz')
         for i in glob.glob(filedir+'/reduction/wrfout*'):
 	    print ('Tarring file,', i)            
-	    tar.add(i)
+	    tar.add(i, arcname = i.replace(filedir, ''))
         tar.close()
 init_reduction('./../planetWRF/WRFV3/run/new_wbm')
  
