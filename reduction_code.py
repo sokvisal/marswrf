@@ -28,6 +28,7 @@ def load_temp(filename, data):
     phb = data.variables['PHB'][:] # base state geopot height
     
     u = data.variables['U'][:] # zonal wind
+    v = data.variables['V'][:] # zonal meridional wind
     
     pot_temp = t + t0 # potential temperature
     press = p + pb # pressure
@@ -39,8 +40,9 @@ def load_temp(filename, data):
     temp = temp.mean(axis = 3) # avg in long
     press = press.mean(axis = 3) # avg in long
     u = u.mean(axis = 3) # avg in long
+    v = v.mean(axis = 3)
     
-    return ls, temp, press, geo_height, u
+    return ls, temp, press, geo_height, u, v
 
 def load_misc(filename, data, var_name):
     var = var_name + '_PHY_AM'
@@ -76,22 +78,23 @@ def init_reduction(filedir):
                 nc_file = i
                 data = Dataset(nc_file, mode='r')
                 
-                ls, temp, press, geoH, u = load_temp(nc_file, data)
+                ls, temp, press, geoH, u, v = load_temp(nc_file, data)
             else:
                 nc_file = i
                 data = Dataset(nc_file, mode='r')
         		    
-                ls2, temp2, press2, geoH2, u2 = load_temp(nc_file, data)
+                ls2, temp2, press2, geoH2, u2, v2 = load_temp(nc_file, data)
         		    
                 ls = np.concatenate((ls, ls2),axis=0)
                 temp = np.concatenate((temp, temp2),axis=0)
                 press = np.concatenate((press, press2),axis=0)
                 geoH = np.concatenate((geoH, geoH2),axis=0)
                 u = np.concatenate((u, u2),axis=0)
+                v = np.concatenate((v, v2),axis=0)
         	    
         filedir2 = i.replace('wrfout','reduction/wrfout')
-        var_list = ['_ls','_temp','_press','_geoH', '_u']
-        for num, i in enumerate([ls,temp,press,geoH,u]):
+        var_list = ['_ls','_temp','_press','_geoH', '_u', '_v']
+        for num, i in enumerate([ls,temp,press,geoH,u,v]):
             print('Saving', var_list[num])
             np.save(filedir2 + var_list[num], i)
     
