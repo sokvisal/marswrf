@@ -51,10 +51,17 @@ def load_misc(filename, data, var_name):
     var2 = var_name + '_PHY_PM'
     t_pm = data.variables[var2][:] # solar long
 
-    t_d = t_pm.mean(axis=3) - t_am.mean(axis=3) 
+    t_d = t_pm.mean(axis=3) - t_am.mean(axis=3)
+    t_a = t_pm.mean(axis=3) + t_am.mean(axis=3) 
+    
     t_d_2pa = t_pm[:,42,:,:] - t_am[:,42,:,:]
+    t_a_2pa = t_pm[:,42,:,:] + t_am[:,42,:,:]
 
-    return (t_d)/2., t_d_2pa/2.
+    return t_a/2., t_d/2.,  t_a_2pa/2., t_d_2pa/2.
+
+def load_misc2D(filename, data, var_name):
+    temp = data.variables[var_name][:].mean(axis=3)
+    return temp
 
 def load_misc3D(filename, data, var_name):
     temp = data.variables[var_name][:]
@@ -110,18 +117,22 @@ def init_reduction(filedir):
                 nc_file = i
                 data = Dataset(nc_file, mode='r')
 		
-                t_d, t_d_2Pa = load_misc(nc_file, data, 'T' )
+                t_a, t_d, t_a_2Pa, t_d_2Pa = load_misc(nc_file, data, 'T' )
             else: 
                 nc_file = i
                 data = Dataset(nc_file, mode='r')
 		
-                t_d2, t_d2_2Pa = load_misc(nc_file, data, 'T')
+                t_a2, t_d2, t_a2_2Pa, t_d2_2Pa = load_misc(nc_file, data, 'T')
+                
+                t_a = np.concatenate((t_a, t_a2),axis=0)
                 t_d = np.concatenate((t_d, t_d2),axis=0)
+                
+                t_a_2Pa = np.concatenate((t_a_2Pa, t_a2_2Pa),axis=0)
                 t_d_2Pa = np.concatenate((t_d_2Pa, t_d2_2Pa),axis=0)
 	
         filedir3 = i.replace('auxhist9','reduction/wrfout')        
-        var_list = ['_t_d','_t_d_2Pa']
-        for num, i in enumerate([t_d,t_d_2Pa]):
+        var_list = ['_t_a', '_t_d', '_t_a_2Pa', '_t_d_2Pa']
+        for num, i in enumerate([t_a, t_d, t_a_2Pa, t_d_2Pa]):
             np.save(filedir3 + var_list[num], i)
  
     def auxhist5():    
