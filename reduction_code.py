@@ -65,7 +65,6 @@ def init_reduction(filedir):
         filepath = filedir + '/wrfout_d01*'
         print (filepath)
         
-        tar = tarfile.open(filedir+'/reduction.tar.gz', 'w:gz')
         if not os.path.exists(filedir+'/reduction'): 
             os.mkdir(filedir+'/reduction')
         	#    print filedir
@@ -94,9 +93,6 @@ def init_reduction(filedir):
         for num, i in enumerate([ls,temp,press,geoH,u]):
             print('Saving', var_list[num])
             np.save(filedir2 + var_list[num], i)
-            filename = filedir2.replace(filedir, '')
-            tar.add(filedir2 + var_list[num]+'.npy', arcname = filename + var_list[num]+ '.npy')
-        tar.close()
     
     def auxhist9():
         print ('hi')  
@@ -104,8 +100,6 @@ def init_reduction(filedir):
         filepath2 = filedir + '/auxhist9*'
         print (filepath2)
         
-        #tar = tarfile.open(filedir+'/reduction.tar.gz', 'w:gz')
-        with gzip.open(filedir+'/reduction.tar.gz', 'wb') as f:
         for num, i in enumerate(sorted(glob.glob(filepath2))):
             print (i)
             if num == 0:
@@ -125,16 +119,10 @@ def init_reduction(filedir):
         var_list = ['_t_d','_t_d_2Pa']
         for num, i in enumerate([t_d,t_d_2Pa]):
             np.save(filedir3 + var_list[num], i)
-            filename = filedir3.replace(filedir, '')
-            #tar.add(filedir3 + var_list[num]+'.npy', arcname = filename + var_list[num]+ '.npy')
-            f.write(filedir3 + var_list[num]+'.npy', arcname = filename + var_list[num]+ '.npy')
-        #tar.close()
-        f.close()
  
     def auxhist5():    
         filepath2 = filedir+'/auxhist5*'
         
-        tar = tarfile.open(filedir+'/reduction.tar.gz', 'w:gz')
         for num, i in enumerate(sorted(glob.glob(filepath2))):
             print (i)
             if num == 0:
@@ -155,13 +143,15 @@ def init_reduction(filedir):
         for num, i in enumerate([psfc,ls_psfc]):
             print(psfc.shape)
             np.save(filedir3 + var_list[num], i)
-            filename = filedir3.replace(filedir, '')
-            tar.add(filedir3 + var_list[num]+'.npy', arcname = filename + var_list[num]+ '.npy')
-        tar.close()
 
     if arg == 'wrfout': return wrfout()
     if arg == 'auxhist9': return auxhist9()
     if arg == 'auxhist5': return auxhist5()
+    
+    tar = tarfile.open(filedir+'/reduction.tar.gz', 'w:gz')
+    for i in glob.glob(filedir+'/reduction/wrfout*'):
+        tar.add(i)
+    tar.close()
 #init_reduction('./../planetWRF/WRFV3/run/new_wbm')
  
     
