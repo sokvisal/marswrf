@@ -61,7 +61,7 @@ def load_misc3D(filename, data, var_name):
     
 def init_reduction(filedir):
     arg = sys.argv[1]
-    tar_cond = sys.argv[2]
+    tar_cond = int(sys.argv[2])
     def wrfout():
         filepath = filedir + '/wrfout_d01*'
         print (filepath)
@@ -145,15 +145,16 @@ def init_reduction(filedir):
             print(psfc.shape)
             np.save(filedir3 + var_list[num], i)
 
-    if arg == 'wrfout': return wrfout()
-    if arg == 'auxhist9': return auxhist9()
-    if arg == 'auxhist5': return auxhist5()
+    if arg == 'wrfout': wrfout()
+    if arg == 'auxhist9': auxhist9()
+    if arg == 'auxhist5': auxhist5()
     
-    if tar_cond:
-        tar = tarfile.open(filedir+'/reduction.tar.gz', 'w:gz')
+    print (tar_cond)
+    if tar_cond == 1:
+	tar = tarfile.open(filedir+'/reduction.tar.gz', 'w:gz')
         for i in glob.glob(filedir+'/reduction/wrfout*'):
-            tar.add(i)
+	    print ('Tarring file,', i)            
+	    tar.add(i)
         tar.close()
-#init_reduction('./../planetWRF/WRFV3/run/new_wbm')
+init_reduction('./../planetWRF/WRFV3/run/new_wbm')
  
-    
