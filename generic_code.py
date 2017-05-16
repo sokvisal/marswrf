@@ -28,7 +28,6 @@ def martians_month(ls, data):
     return temp
 
 def redefine_latField(v):
-    print (v.shape)
     temp = np.zeros((52,36))
     for i in np.arange(v.shape[0]):
         for j in np.arange(v.shape[1]-1):
@@ -214,7 +213,7 @@ def zonal_diff(filedir, month, ls2):
         
     print ('Saving 2nd cool shit')
     fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
-#    plt.savefig('zonal_tdiff.png',bbox_inches='tight', dpi=600)
+    plt.savefig('zonal_tdiff.png',bbox_inches='tight', dpi=600)
     
     fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(20,14))
     for i, ax in enumerate(axes.flat):
@@ -232,10 +231,10 @@ def zonal_diff(filedir, month, ls2):
         
     print ('Saving 3rd cool shit')
     fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
-#    plt.savefig('zonal_tdiff_2Pa.png',bbox_inches='tight', dpi=600)
+    plt.savefig('zonal_tdiff_2Pa.png',bbox_inches='tight', dpi=600)
 
 #zonal_avg('./test_data/reduction_mcd_wbm/',12,2)
-#zonal_diff('./test_data/reduction_mcd_wbm/',12,2)
+#zonal_diff('./test_data/reduction_mcd_kdm/',12,2)
 
 def fft_hovmoller(filedir):
     print ('Looking at spectral of surface presssure')
@@ -259,10 +258,11 @@ def fft_hovmoller(filedir):
     
     psfc = psfc[:,18,:]#.mean(axis=1)
     
-    idx = np.where((ls>300)&(ls<320))[0]
+    idx = np.where((ls>270)&(ls<301))[0]
     ls = ls[idx]
     psfc = psfc[idx] 
     psfc = psfc - psfc.mean(axis=0)
+    print (psfc.shape)
 #    
     lon = np.linspace(0,360,72)
     lon, ls = np.meshgrid(lon, ls)
@@ -278,12 +278,24 @@ def fft_hovmoller(filedir):
     
     plt.subplot(1,2,2)
     ampl, phase, cycle, waven = fft.spec(psfc, 1./8, 1./72, axes=[0,1])
-    plt.contourf(cycle, waven[:5], np.log10(ampl).T[:5])
+    
+    padd = np.zeros((psfc.shape[0]*2, psfc.shape[1]*2))
+    padd[:psfc.shape[0], :psfc.shape[1]] = psfc
+    amplt = np.fft.fftshift(np.fft.fft2(padd))
+    amplt = np.abs(amplt)**2
+    c = np.fft.fftshift(np.fft.fftfreq(amplt.shape[0], .125))
+    wavenu = np.fft.fftshift(np.fft.fftfreq(amplt.shape[1],2.51748252))[72:83]*360
+#    cycle, wavenu = np.meshgrid(cycle, wavenu)
+    amplt = np.log10(amplt).T[72:83]
+    
+#    plt.contourf(cycle, waven[:5], np.log10(ampl).T[:5])
+    plt.contourf(c, wavenu, amplt)
+    plt.colorbar()
     plt.ylabel('Wavenumber')
     plt.xlabel('Cycles/sol')
     plt.title(r'Amplitude of FFT of Hovm$\mathrm{\"{o}}$ller Diagram')
     
-#fft_hovmoller('./test_data/reduction/')
+#fft_hovmoller('./test_data/reduction_mcd_wbm/')
 
 def mer_stream_func(filedir):
     print ('Looking at zonal mean meridional function')
@@ -307,26 +319,34 @@ def mer_stream_func(filedir):
     v = v[idx1:idx2]
     ls = ls[idx1:idx2]
     
-    zonal_v = martians_month(ls, v)[0]
-    zonal_p = martians_month(ls, p)[0]
-    zonal_v = redefine_latField(zonal_v)
-#    print (zonal_p[:,35])
+    msf = np.zeros((3,52,36))
+    for k in range(0,3):
     
-    lat = np.linspace(-90,90,36)
+        zonal_v = martians_month(ls, v)[k]
+        zonal_p = martians_month(ls, p)[k]
+        zonal_v = redefine_latField(zonal_v)
+        
+        lat = np.linspace(-90,90,36)
+        
+        a = 3389920.
+        g = 3.727
+        temp = np.zeros((52,36))
+        for i in np.arange(1,temp.shape[0]):
+            for j in np.arange(temp.shape[1]):
+                temp[i,j] = 2*np.pi*(a/g)*np.cos(np.deg2rad(lat[j]))*np.trapz(zonal_v[:i,j][::-1],zonal_p[:i,j][::-1])
+        msf[k] = temp
     
-    msf = np.zeros((52,36))
-    for i in np.arange(1,msf.shape[0]):
-        for j in np.arange(msf.shape[1]):
-#            print (zonal_p[:i,j],i,j)
-            msf[i,j] = 2*np.pi*np.cos( np.radians(lat[j]))*scipy.integrate.simps(zonal_v[:i,j],zonal_p[:i,j])
+    msf = msf.mean(axis=0)
+    press = np.arange(0,52)
+    lat, press = np.meshgrid(lat, press)
+    print (zonal_p.shape, lat.shape, msf.shape)
             
-    plt.contourf(msf)
+    plt.contourf(lat, zonal_p, msf)
     plt.gca().invert_yaxis()
     plt.yscale('log')
     plt.colorbar()
     
-    
-mer_stream_func('./test_data/reduction_mcd_wbm/')
+mer_stream_func('./test_data/reduction_mcd_kdm/')
 
 def zonal_temperature2(filename, ls1, ls2):
     nc_file = filename
