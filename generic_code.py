@@ -6,6 +6,7 @@ matplotlib.use('Agg')
 #import matplotlib
 import matplotlib.pylab as plt
 import matplotlib.colors as colors
+from matplotlib.backends.backend_pdf import PdfPages
 #import matplotlib.tri as tri
 import scipy
 import os
@@ -19,11 +20,17 @@ def find_ls_idx(ls_arr, ls):
     assert np.min(np.abs(ls_arr-ls)) < 1, 'Solar Longitude {} not in the file'.format(ls)
     return idx
 
-def martians_month(ls, data):
+def martians_month(ls, data, avg):
     temp = []
     for i in np.arange(0, 12):
         idx = np.where((ls>i*30)&(ls<(i+1)*30))
-        temp.append(data[idx].mean(axis=0))
+        if avg:
+#            temp = np.dstack((temp, data[idx].mean(axis=0)))
+            temp.append(data[idx].mean(axis=0))
+        else:
+#            temp = np.dstack((temp, data[idx]))
+            temp.append(data[idx])
+            #temp.append(data[idx])
     temp = np.array(temp)
     return temp
 
@@ -33,6 +40,49 @@ def redefine_latField(v):
         for j in np.arange(v.shape[1]-1):
             temp[i,j] = np.mean(v[i,j]+v[i,j+1])
     return temp
+
+def zonal_plt_monthly(ydata, ls, data, title,  cmap):
+    fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(20,14))
+    for i, ax in enumerate(axes.flat):
+        y = ydata[i-1][4:]
+        
+        #press2 = zonal_p[i-1].mean(axis=1)
+        lat = np.linspace(-90, 90, 36) 
+        temp_press = np.linspace(1e-2, 900, 52)[4:]
+        
+        lat, temp_press = np.meshgrid(lat, temp_press)
+        
+        d = data[i-1][4:]
+        
+        im = ax.contourf(lat, y, d, 12, cmap=cmap)
+        ax.contour(lat, y, d, 12, linewidths=0.5, colors='k')
+        
+        ax.set_title(r'Avg Zonal {} LS {}-{} at 2 Pa'.format((title), (i)*30, (i+1)*30))
+        ax.invert_yaxis()
+        ax.set_yscale('log')
+        ax.set_ylim([900, 1e-2])
+        
+#        print ('Saving 1st cool shit')
+    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
+    plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=600)
+
+def basemap_plt_monthly(data, ls, title, cmap):
+    fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(20,14))
+    for i, ax in enumerate(axes.flat):
+        d = data[i-1]
+        
+        #press2 = zonal_p[i-1].mean(axis=1)
+        lat = np.linspace(-90, 90, 36) 
+        lon = np.linspace(0, 360, 72)
+        
+        lon, lat = np.meshgrid(lon, lat)
+
+        im = ax.contourf(lon, lat, d, cmap='viridis')
+        ax.contour(lon, lat, d, linewidths=0.5, colors='black')
+        ax.set_title(r'Avg {} LS {}-{} at 2 Pa'.format((title), (i)*30, (i+1)*30))
+        
+    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
+    plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=600)
 
 def zonal_avg(filedir, month, ls2):
     print ('Looking at zonal avg')
@@ -60,86 +110,31 @@ def zonal_avg(filedir, month, ls2):
     temp = temp[idx1:idx2]
     u = u[idx1:idx2]
     p = p[idx1:idx2]
-    print (ls)
-    
-    zonal_t = []
-    zonal_u = []
-    zonal_p = []
-    for i in np.arange(0, 12):
-        print ('month', i+1)
-        idx = np.where((ls>i*30)&(ls<(i+1)*30))
-        zonal_t.append(temp[idx].mean(axis=0))
-        zonal_u.append(u[idx].mean(axis=0))
-        zonal_p.append(p[idx].mean(axis=0))
-    del temp, p
-    zonal_t = np.array(zonal_t)
-    zonal_u = np.array(zonal_u)
-    zonal_p = np.array(zonal_p)
+
+    zonal_t = martians_month(ls, temp, True)
+    zonal_u = martians_month(ls, u, True)
+    zonal_p = martians_month(ls, p, True)
     
     print ('Plotting some cool shit')
-    fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(20,14))
-    for i, ax in enumerate(axes.flat):
-        press = zonal_p[i-1][4:]
-        
-        #press2 = zonal_p[i-1].mean(axis=1)
-        lat = np.linspace(-90, 90, 36) 
-        temp_press = np.linspace(1e-2, 900, 52)[4:]
-        
-        lat, temp_press = np.meshgrid(lat, temp_press)
-        
-        temp = zonal_t[i-1][4:]
-        print (temp_press.shape, lat.shape, temp.shape)
-#        temp = temp[4:]
-        
-        im = ax.contourf(lat, press, temp, 12, cmap='viridis')
-        ax.contour(lat, press, temp, 12, colors='k')
-        
-        ax.set_title(r'Avg Zonal Temp LS {}-{}'.format((i)*30, (i+1)*30))
-        ax.invert_yaxis()
-        ax.set_yscale('log')
-        ax.set_ylim([900, 1e-2])
-    
-    print ('Saving 1st cool shit')
-    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
-    plt.savefig('zonal_temp.png',bbox_inches='tight', dpi=600)
-    
-    print ('Saving 2nd cool shit')
-    fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(20,14))
-    for i, ax in enumerate(axes.flat):
-        press = zonal_p[i-1][4:]
-        
-        #press2 = zonal_p[i-1].mean(axis=1)
-        lat = np.linspace(-90, 90, 36) 
-        temp_press = np.linspace(1e-2, 900, 52)[4:]
-        
-        lat, temp_press = np.meshgrid(lat, temp_press)
-        
-        u = zonal_u[i-1][4:]
-        
-        im = ax.contourf(lat, press, u, 12, cmap='inferno')
-        ax.contour(lat, press, u, 12, colors='k')
-        
-        ax.set_title(r'Avg Zonal Wind LS {}-{}'.format((i)*30, (i+1)*30))
-        ax.invert_yaxis()
-        ax.set_yscale('log')
-        ax.set_ylim([900, 1e-2])
-    
-    print ('Saving 2nd cool shit')
-    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
-    plt.savefig('zonal_wind.png',bbox_inches='tight', dpi=600)
+    print ('Saving 1st shit')
+    zonal_plt_monthly(zonal_p, ls, zonal_t, 'Temp', 'viridis')
+    print ('Saving 2nd shit')
+    zonal_plt_monthly(zonal_p, ls, zonal_u, 'Wind', 'inferno')
 
-def zonal_diff(filedir, month, ls2):
+def zonal_diff(filedir, var1, var2):
+    if var1 == '*_t_d.npy': name = 'diff'
+    else: name = 'avg'
     print ('Looking at thermal tides')
     
     filepath = glob.glob(filedir + '*_press.npy')[0]
     print (filepath)
     p = np.load(filepath)
-        
-    filepath = glob.glob(filedir + '*_t_d.npy')[0]
+
+    filepath = glob.glob(filedir + var1)[0]
     t_d = np.load(filepath)
     t_d = t_d
     
-    filepath = glob.glob(filedir + '*_t_d_2Pa.npy')[0]
+    filepath = glob.glob(filedir + var2)[0]
     t_d_2Pa = np.load(filepath)
     t_d_2Pa = t_d_2Pa 
     
@@ -154,16 +149,12 @@ def zonal_diff(filedir, month, ls2):
     t_d_2Pa = t_d_2Pa[idx1:idx2]
     p = p[idx1:idx2]
     
-    print (t_d_2Pa.shape)
-    
 #    test_diff = t_d_2Pa.reshape((223,3,36,72)).mean(axis=1)
     ampl, phase, axis = fft.spec1d(t_d_2Pa, 1/72., use_axes = 2)
     ampl = ampl
     phase = phase
-    print (np.min(ampl))
-#    ampl.hstack(axis=0)
-#    phase.hstack(axis=0)
     
+    # stacking the array with the respectful wavenumber
     test = np.zeros((4,669,36)) # amplitude
     test2 = np.zeros((4,669,36)) # phase
     for j in np.arange(0,4):
@@ -181,60 +172,26 @@ def zonal_diff(filedir, month, ls2):
         amplitude = test[i]
         phase = test2[i]
         im = ax.contourf(t_ls, t_lat, amplitude, cmap='viridis')
-#        ax.contour(t_ls, t_lat, phase, 20)
-        ax.set_title(r'Wavenumber {} Tide'.format(i))
-#    plt.contour(t_ls, t_lat, np.tan(test2), colors='k')
-    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
+        ax.set_title(r'm = {}'.format(i))
+    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.06)
+    plt.savefig('wavenumber_timeseries_tdiff.png')
     
-    zonal_t_d = martians_month(ls, t_d)
-    zonal_t_2P = martians_month(ls, t_d_2Pa)
-    zonal_p = martians_month(ls, p)
+    zonal_t_d = martians_month(ls, t_d, True)
+    zonal_t_2P = martians_month(ls, t_d_2Pa, True)
+    zonal_p = martians_month(ls, p, True)
     
-    fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(20,14))
-    for i, ax in enumerate(axes.flat):
-        press = zonal_p[i-1][4:]
-        
-        #press2 = zonal_p[i-1].mean(axis=1)
-        lat = np.linspace(-90, 90, 36) 
-        temp_press = np.linspace(1e-2, 900, 52)[4:]
-        
-        #lat, press = np.meshgrid(lat, press2[5:])
-        lat, temp_press = np.meshgrid(lat, temp_press)
-        
-        temp = zonal_t_d[i-1][4:]
-        
-        im = ax.contourf(lat, press, temp, 12, cmap='viridis')
-        ax.contour(lat, press, temp, 12, linewidths=0.5, colors='black')
-        
-        ax.set_title(r'Avg Zonal T$_d$ LS {0}-{1}'.format((i)*30, (i+1)*30))
-        ax.invert_yaxis()
-        ax.set_yscale('log')
-        ax.set_ylim([900, 1e-2])
-        
-    print ('Saving 2nd cool shit')
-    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
-    plt.savefig('zonal_tdiff.png',bbox_inches='tight', dpi=600)
-    
-    fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(20,14))
-    for i, ax in enumerate(axes.flat):
-        t_2P = zonal_t_2P[i-1]
-        
-        #press2 = zonal_p[i-1].mean(axis=1)
-        lat = np.linspace(-90, 90, 36) 
-        lon = np.linspace(0, 360, 72)
-        
-        lon, lat = np.meshgrid(lon, lat)
-
-        im = ax.contourf(lon, lat, t_2P, cmap='viridis')
-        ax.contour(lon, lat, t_2P, linewidths=0.5, colors='black')
-        ax.set_title(r'Avg T$_d$ LS {0}-{1} at 2 Pa'.format((i)*30, (i+1)*30))
+    print ('Saving 2nd shit')
+    zonal_plt_monthly(zonal_p, ls, zonal_t_d, 'T$_{\mathrm{'+name+'}}$', 'viridis')
         
     print ('Saving 3rd cool shit')
-    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
-    plt.savefig('zonal_tdiff_2Pa.png',bbox_inches='tight', dpi=600)
+    basemap_plt_monthly(zonal_t_2P, ls, 'T$_{\mathrm{'+name+'}}$', 'viridis')
 
-#zonal_avg('./test_data/reduction_mcd_wbm/',12,2)
-#zonal_diff('./test_data/reduction_mcd_kdm/',12,2)
+pdFfigures = PdfPages('test.pdf')
+directory = './test_data/reduction_no_dust_wbm/'
+with PdfPages(directory+'figures.pdf') as pdFfigures:
+    zonal_avg(directory,12,2)
+    zonal_diff(directory, '*_t_d.npy', '*_t_d_2Pa.npy')
+    zonal_diff(directory, '*_t_a.npy', '*_t_a_2Pa.npy')
 
 def fft_hovmoller(filedir):
     print ('Looking at spectral of surface presssure')
@@ -258,23 +215,26 @@ def fft_hovmoller(filedir):
     
     psfc = psfc[:,18,:]#.mean(axis=1)
     
-    idx = np.where((ls>270)&(ls<301))[0]
-    ls = ls[idx]
-    psfc = psfc[idx] 
-    psfc = psfc - psfc.mean(axis=0)
-    print (psfc.shape)
-#    
-    lon = np.linspace(0,360,72)
-    lon, ls = np.meshgrid(lon, ls)
+#    idx = np.where((ls>300)&(ls<331))[0]
+#    ls = ls[idx]
+#    psfc = psfc[idx]
     
-    plt.figure(figsize=(10,4))
-    plt.subplot(1,2,1)
-    plt.contourf(lon, ls, psfc)
-    plt.ylabel('Solar Longitude')
-    plt.xlabel('Longitude')
-    plt.title(r'Hovm$\mathrm{\"{o}}$ller Diagram of Surface Pressure')
-
-    lat = np.linspace(-90,90,36)
+    psfc = martians_month(ls, psfc, False)
+    print (psfc.shape)
+    for i in range(0,12):
+        psfc[i] = psfc[i] - psfc[i].mean(axis=2).mean(axis=1)
+    ampl, phase, cycle, waven = fft.spec(psfc, 1./8, 1./72, axes=[1,2])
+    
+#    lon = np.linspace(0,360,72)
+#    lon, ls = np.meshgrid(lon, ls)
+#    plt.figure(figsize=(10,4))
+#    plt.subplot(1,2,1)
+#    plt.contourf(lon, ls, psfc)
+#    plt.ylabel('Solar Longitude')
+#    plt.xlabel('Longitude')
+#    plt.title(r'Hovm$\mathrm{\"{o}}$ller Diagram PSFC')
+#
+#    lat = np.linspace(-90,90,36)
     
     plt.subplot(1,2,2)
     ampl, phase, cycle, waven = fft.spec(psfc, 1./8, 1./72, axes=[0,1])
@@ -289,7 +249,7 @@ def fft_hovmoller(filedir):
     amplt = np.log10(amplt).T[72:83]
     
 #    plt.contourf(cycle, waven[:5], np.log10(ampl).T[:5])
-    plt.contourf(c, wavenu, amplt)
+    plt.contourf(cycle[9], waven[9], ampl[9], cmap='inferno')
     plt.colorbar()
     plt.ylabel('Wavenumber')
     plt.xlabel('Cycles/sol')
@@ -319,22 +279,24 @@ def mer_stream_func(filedir):
     v = v[idx1:idx2]
     ls = ls[idx1:idx2]
     
+    start_month = 3
+    end_month = 4
     msf = np.zeros((3,52,36))
-    for k in range(0,3):
+    for k in range(start_month,end_month):
     
         zonal_v = martians_month(ls, v)[k]
         zonal_p = martians_month(ls, p)[k]
         zonal_v = redefine_latField(zonal_v)
         
         lat = np.linspace(-90,90,36)
-        
+        print (zonal_p[:,0])
         a = 3389920.
         g = 3.727
         temp = np.zeros((52,36))
         for i in np.arange(1,temp.shape[0]):
             for j in np.arange(temp.shape[1]):
                 temp[i,j] = 2*np.pi*(a/g)*np.cos(np.deg2rad(lat[j]))*np.trapz(zonal_v[:i,j][::-1],zonal_p[:i,j][::-1])
-        msf[k] = temp
+        msf[k-start_month] = temp
     
     msf = msf.mean(axis=0)
     press = np.arange(0,52)
@@ -346,55 +308,7 @@ def mer_stream_func(filedir):
     plt.yscale('log')
     plt.colorbar()
     
-mer_stream_func('./test_data/reduction_mcd_kdm/')
-
-def zonal_temperature2(filename, ls1, ls2):
-    nc_file = filename
-    data = Dataset(nc_file, mode='r')
-    
-    t = data.variables['T'][:] # perturbation potential temp
-    p = data.variables['P'][:] # perturbation pressure
-    pb = data.variables['PB'][:] # base state pressure
-    ls = data.variables['L_S'][:] # solar longitude
-    
-    idx1 = find_ls_idx(ls, ls1)
-    idx2 = find_ls_idx(ls, ls2)
-
-    t0 = 300. #data.variables['T00'][:] # base temperature
-    p0 = 610. #data.variables['P00'][:] # base pressure
-    r_d = 191.8366
-    cp = 767.3466
-    g = 3.727
-    gamma = r_d/cp
-    
-    pot_temp = t + t0 # potential temperature
-    press = p + pb # pressure
-    
-    temp = pot_temp*(press/p0)**gamma # temperature
-    
-    temp_avg = temp.mean(axis = 3)[idx1:idx2].mean(axis = 0) # avg in long and solar long
-    press_avg = press.mean(axis = 3).mean(axis = 2)[idx1:idx2].mean(axis = 0) # avg in lat, long and solar long
-    
-    temp_total_avg = temp_avg.mean(axis=1).mean() # total avg temp
-    h = (r_d*(temp_total_avg/g))*(np.log(p0/press_avg)/np.log(np.e)) # hypsometric equation?
-    
-    return temp_avg, press_avg, h/1000.
-
-def zonal_wind(filename, ls1, ls2):
-    nc_file = filename
-    data = Dataset(nc_file, mode='r')
-    
-    u = data.variables['U'][:] # zonal wind speed in m/s
-#    p = data.variables['P'][:] # perturbation pressure
-#    pb = data.variables['PB'][:] # base state pressure
-    ls = data.variables['L_S'][:] # solar longitude
-    
-    idx1 = find_ls_idx(ls, ls1)
-    idx2 = find_ls_idx(ls, ls2)
-    
-    u_avg = u.mean(axis = 3)[idx1:idx2].mean(axis = 0) # avg in long and solar long
-    
-    return u_avg
+#mer_stream_func('./test_data/reduction_no_dust_wbm/')
 
 def net_hr_aer(filename, ls1, ls2):
     nc_file = filename
