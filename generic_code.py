@@ -20,17 +20,11 @@ def find_ls_idx(ls_arr, ls):
     assert np.min(np.abs(ls_arr-ls)) < 1, 'Solar Longitude {} not in the file'.format(ls)
     return idx
 
-def martians_month(ls, data, avg):
+def martians_month(ls, data):
     temp = []
     for i in np.arange(0, 12):
         idx = np.where((ls>i*30)&(ls<(i+1)*30))
-        if avg:
-#            temp = np.dstack((temp, data[idx].mean(axis=0)))
-            temp.append(data[idx].mean(axis=0))
-        else:
-#            temp = np.dstack((temp, data[idx]))
-            temp.append(data[idx])
-            #temp.append(data[idx])
+        temp.append(data[idx].mean(axis=0))
     temp = np.array(temp)
     return temp
 
@@ -38,7 +32,8 @@ def redefine_latField(v):
     temp = np.zeros((52,36))
     for i in np.arange(v.shape[0]):
         for j in np.arange(v.shape[1]-1):
-            temp[i,j] = np.mean(v[i,j]+v[i,j+1])
+            temp[i,j] = np.mean([v[i,j],v[i,j+1]])
+            if i ==0 : print (j,v[i,j],v[i,j+1],temp[i,j] )
     return temp
 
 def zonal_plt_monthly(ydata, ls, data, title,  cmap):
@@ -57,7 +52,7 @@ def zonal_plt_monthly(ydata, ls, data, title,  cmap):
         im = ax.contourf(lat, y, d, 12, cmap=cmap)
         ax.contour(lat, y, d, 12, linewidths=0.5, colors='k')
         
-        ax.set_title(r'Avg Zonal {} LS {}-{} at 2 Pa'.format((title), (i)*30, (i+1)*30))
+        ax.set_title(r'{} LS {}-{} at 2 Pa'.format((title), (i)*30, (i+1)*30))
         ax.invert_yaxis()
         ax.set_yscale('log')
         ax.set_ylim([900, 1e-2])
@@ -111,15 +106,15 @@ def zonal_avg(filedir, month, ls2):
     u = u[idx1:idx2]
     p = p[idx1:idx2]
 
-    zonal_t = martians_month(ls, temp, True)
-    zonal_u = martians_month(ls, u, True)
-    zonal_p = martians_month(ls, p, True)
+    zonal_t = martians_month(ls, temp)
+    zonal_u = martians_month(ls, u)
+    zonal_p = martians_month(ls, p)
     
     print ('Plotting some cool shit')
     print ('Saving 1st shit')
-    zonal_plt_monthly(zonal_p, ls, zonal_t, 'Temp', 'viridis')
+    zonal_plt_monthly(zonal_p, ls, zonal_t, 'Zonal Mean Temp', 'viridis')
     print ('Saving 2nd shit')
-    zonal_plt_monthly(zonal_p, ls, zonal_u, 'Wind', 'inferno')
+    zonal_plt_monthly(zonal_p, ls, zonal_u, 'Zonal Mean Wind', 'inferno')
 
 def zonal_diff(filedir, var1, var2):
     if var1 == '*_t_d.npy': name = 'diff'
@@ -174,7 +169,7 @@ def zonal_diff(filedir, var1, var2):
         im = ax.contourf(t_ls, t_lat, amplitude, cmap='viridis')
         ax.set_title(r'm = {}'.format(i))
     fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.06)
-    plt.savefig('wavenumber_timeseries_tdiff.png')
+    plt.savefig('wavenumber_timeseries_tdiff.png', bbox_inches='tight', dpi=600)
     
     zonal_t_d = martians_month(ls, t_d, True)
     zonal_t_2P = martians_month(ls, t_d_2Pa, True)
@@ -186,12 +181,12 @@ def zonal_diff(filedir, var1, var2):
     print ('Saving 3rd cool shit')
     basemap_plt_monthly(zonal_t_2P, ls, 'T$_{\mathrm{'+name+'}}$', 'viridis')
 
-pdFfigures = PdfPages('test.pdf')
-directory = './test_data/reduction_no_dust_wbm/'
-with PdfPages(directory+'figures.pdf') as pdFfigures:
-    zonal_avg(directory,12,2)
-    zonal_diff(directory, '*_t_d.npy', '*_t_d_2Pa.npy')
-    zonal_diff(directory, '*_t_a.npy', '*_t_a_2Pa.npy')
+#pdFfigures = PdfPages('test.pdf')
+#directory = './test_data/reduction_no_dust_wbm/'
+#with PdfPages(directory+'figures.pdf') as pdFfigures:
+#    zonal_avg(directory,12,2)
+#    zonal_diff(directory, '*_t_d.npy', '*_t_d_2Pa.npy')
+#    zonal_diff(directory, '*_t_a.npy', '*_t_a_2Pa.npy')
 
 def fft_hovmoller(filedir):
     print ('Looking at spectral of surface presssure')
@@ -211,53 +206,51 @@ def fft_hovmoller(filedir):
     
     #avging for specific latitude
     lat = np.linspace(-90,90,36)
-    idx = np.where((lat>-10)&(lat<10))[0]
+#    idx = np.where((lat>-10)&(lat<10))[0]
     
-    psfc = psfc[:,18,:]#.mean(axis=1)
+    surface_press = psfc[:,18,:]#.mean(axis=1)
     
-#    idx = np.where((ls>300)&(ls<331))[0]
-#    ls = ls[idx]
-#    psfc = psfc[idx]
+    for i in np.arange(0,12):
+        idx = np.where((ls>i*30)&(ls<(i+1)*30))[0]
+        print (i*30, (i+1)*30)
+        ls_temp = ls[idx]
+        psfc = surface_press[idx] - surface_press[idx].mean(axis=0)
+        print (idx, surface_press[idx].mean(axis=0).shape)
     
-    psfc = martians_month(ls, psfc, False)
-    print (psfc.shape)
-    for i in range(0,12):
-        psfc[i] = psfc[i] - psfc[i].mean(axis=2).mean(axis=1)
-    ampl, phase, cycle, waven = fft.spec(psfc, 1./8, 1./72, axes=[1,2])
+        lon = np.linspace(0,360,72)
+        lon, ls_temp = np.meshgrid(lon, ls_temp)
+        
+        plt.figure(figsize=(10,4))
+        plt.subplot(1,2,1)
+        plt.contourf(lon, ls_temp, psfc)
+        plt.ylabel('Solar Longitude')
+        plt.xlabel('Longitude')
+        plt.title('{} Diagram PSFC LS {}-{}'.format(('Hovm$_a$'), i*30, (i+1)*30))
     
-#    lon = np.linspace(0,360,72)
-#    lon, ls = np.meshgrid(lon, ls)
-#    plt.figure(figsize=(10,4))
-#    plt.subplot(1,2,1)
-#    plt.contourf(lon, ls, psfc)
-#    plt.ylabel('Solar Longitude')
-#    plt.xlabel('Longitude')
-#    plt.title(r'Hovm$\mathrm{\"{o}}$ller Diagram PSFC')
-#
-#    lat = np.linspace(-90,90,36)
+        lat = np.linspace(-90,90,36)
     
-    plt.subplot(1,2,2)
-    ampl, phase, cycle, waven = fft.spec(psfc, 1./8, 1./72, axes=[0,1])
+        plt.subplot(1,2,2)
+        ampl, phase, cycle, waven = fft.spec(psfc, 1./8, 1./72, axes=[0,1])
     
-    padd = np.zeros((psfc.shape[0]*2, psfc.shape[1]*2))
-    padd[:psfc.shape[0], :psfc.shape[1]] = psfc
-    amplt = np.fft.fftshift(np.fft.fft2(padd))
-    amplt = np.abs(amplt)**2
-    c = np.fft.fftshift(np.fft.fftfreq(amplt.shape[0], .125))
-    wavenu = np.fft.fftshift(np.fft.fftfreq(amplt.shape[1],2.51748252))[72:83]*360
-#    cycle, wavenu = np.meshgrid(cycle, wavenu)
-    amplt = np.log10(amplt).T[72:83]
+        padd = np.zeros((psfc.shape[0]*2, psfc.shape[1]*2))
+        padd[:psfc.shape[0], :psfc.shape[1]] = psfc
+        amplt = np.fft.fftshift(np.fft.fft2(padd))
+        amplt = np.abs(amplt)**2
+        c = np.fft.fftshift(np.fft.fftfreq(amplt.shape[0], .125))
+        wavenu = np.fft.fftshift(np.fft.fftfreq(amplt.shape[1],2.51748252))[72:83]*360
+    #    cycle, wavenu = np.meshgrid(cycle, wavenu)
+        amplt = np.log10(amplt).T[72:83]
+        
+        plt.contourf(cycle, waven[:5], np.log10(ampl).T[:5])
+#        plt.contourf(cycle[9], waven[9], ampl[9], cmap='inferno')
+        plt.colorbar()
+        plt.ylabel('Wavenumber')
+        plt.xlabel('Cycles/sol')
+        plt.title(r'Amplitude of FFT of {} Diagram LS {}-{}'.format('Hovm$_a$', (i*30), ((i+1)*30)))
     
-#    plt.contourf(cycle, waven[:5], np.log10(ampl).T[:5])
-    plt.contourf(cycle[9], waven[9], ampl[9], cmap='inferno')
-    plt.colorbar()
-    plt.ylabel('Wavenumber')
-    plt.xlabel('Cycles/sol')
-    plt.title(r'Amplitude of FFT of Hovm$\mathrm{\"{o}}$ller Diagram')
-    
-#fft_hovmoller('./test_data/reduction_mcd_wbm/')
+fft_hovmoller('./test_data/reduction_mcd_wbm/')
 
-def mer_stream_func(filedir):
+def msf(filedir):
     print ('Looking at zonal mean meridional function')
     
     filepath = glob.glob(filedir + '*_v.npy')[0]
@@ -279,36 +272,32 @@ def mer_stream_func(filedir):
     v = v[idx1:idx2]
     ls = ls[idx1:idx2]
     
-    start_month = 3
-    end_month = 4
-    msf = np.zeros((3,52,36))
-    for k in range(start_month,end_month):
+
+    msf = np.zeros((12,52,36))
+    p_field = np.zeros((12,52,36))
+    for k in range(0, 12):
     
         zonal_v = martians_month(ls, v)[k]
         zonal_p = martians_month(ls, p)[k]
-        zonal_v = redefine_latField(zonal_v)
+        p_field[k] = zonal_p
+        zonal_v = zonal_v[:,:36]#redefine_latField(zonal_v)
         
         lat = np.linspace(-90,90,36)
         print (zonal_p[:,0])
         a = 3389920.
         g = 3.727
         temp = np.zeros((52,36))
-        for i in np.arange(1,temp.shape[0]):
-            for j in np.arange(temp.shape[1]):
-                temp[i,j] = 2*np.pi*(a/g)*np.cos(np.deg2rad(lat[j]))*np.trapz(zonal_v[:i,j][::-1],zonal_p[:i,j][::-1])
-        msf[k-start_month] = temp
+        for j in np.arange(temp.shape[1]):
+            for i in np.arange(1,temp.shape[0]):
+                temp[i,j] = 2*np.pi*(a/g)*np.cos(np.deg2rad(lat[j]))*zonal_p[0,j]*np.trapz(zonal_v[:i,j][::-1],zonal_p[:i,j][::-1])
+        msf[k] = temp
     
-    msf = msf.mean(axis=0)
-    press = np.arange(0,52)
-    lat, press = np.meshgrid(lat, press)
-    print (zonal_p.shape, lat.shape, msf.shape)
-            
-    plt.contourf(lat, zonal_p, msf)
-    plt.gca().invert_yaxis()
-    plt.yscale('log')
-    plt.colorbar()
+    zonal_plt_monthly(p_field, ls, msf, 'Mean Meridional Streamfunction',  'viridis')
     
-#mer_stream_func('./test_data/reduction_no_dust_wbm/')
+#    
+#directory = './test_data/reduction_mcd_wbm/'
+#with PdfPages(directory+'test.pdf') as pdFfigures:   
+#    msf('./test_data/reduction_no_dust_wbm/')
 
 def net_hr_aer(filename, ls1, ls2):
     nc_file = filename
