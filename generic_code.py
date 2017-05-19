@@ -1,5 +1,5 @@
 import numpy as np
-from netCDF4 import Dataset
+#from netCDF4 import Dataset
 import dwell.fft as fft
 import matplotlib
 matplotlib.use('Agg')
@@ -39,11 +39,12 @@ def redefine_latField(v):
 def zonal_plt_monthly(ydata, ls, data, title,  cmap):
     fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(20,14))
     for i, ax in enumerate(axes.flat):
+        print(i)
         y = ydata[i-1][4:]
         
         #press2 = zonal_p[i-1].mean(axis=1)
         lat = np.linspace(-90, 90, 36) 
-        temp_press = np.linspace(1e-2, 900, 52)[4:]
+        temp_press = np.linspace(1e-2, 900, ydata[i].shape[0])[4:]
         
         lat, temp_press = np.meshgrid(lat, temp_press)
         
@@ -52,8 +53,8 @@ def zonal_plt_monthly(ydata, ls, data, title,  cmap):
         im = ax.contourf(lat, y, d, 12, cmap=cmap)
         ax.contour(lat, y, d, 12, linewidths=0.5, colors='k')
         
-        ax.set_title(r'{} LS {}-{} at 2 Pa'.format((title), (i)*30, (i+1)*30))
-        ax.invert_yaxis()
+        ax.set_title(r'{} LS {}-{}'.format((title), (i)*30, (i+1)*30))
+        #ax.invert_yaxis()
         ax.set_yscale('log')
         ax.set_ylim([900, 1e-2])
         
@@ -241,14 +242,17 @@ def fft_hovmoller(filedir):
     #    cycle, wavenu = np.meshgrid(cycle, wavenu)
         amplt = np.log10(amplt).T[72:83]
         
-        plt.contourf(cycle, waven[:5], np.log10(ampl).T[:5])
-#        plt.contourf(cycle[9], waven[9], ampl[9], cmap='inferno')
+#        plt.contourf(cycle, waven[:5], np.log10(ampl).T[:5])
+        plt.contourf(c, wavenu, amplt, cmap='inferno',vmin=0,vmax=12)
         plt.colorbar()
         plt.ylabel('Wavenumber')
         plt.xlabel('Cycles/sol')
         plt.title(r'Amplitude of FFT of {} Diagram LS {}-{}'.format('Hovm$_a$', (i*30), ((i+1)*30)))
-    
-fft_hovmoller('./test_data/reduction_mcd_wbm/')
+        plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=1200)
+
+#directory = './test_data/reduction/'
+#with PdfPages(directory+'hovmoller.pdf') as pdFfigures:
+#    fft_hovmoller(directory)
 
 def msf(filedir):
     print ('Looking at zonal mean meridional function')
@@ -272,6 +276,10 @@ def msf(filedir):
     v = v[idx1:idx2]
     ls = ls[idx1:idx2]
     
+    
+    np.save('p.npy', p)
+    np.save('v.npy', v)
+    
 
     msf = np.zeros((12,52,36))
     p_field = np.zeros((12,52,36))
@@ -280,24 +288,28 @@ def msf(filedir):
         zonal_v = martians_month(ls, v)[k]
         zonal_p = martians_month(ls, p)[k]
         p_field[k] = zonal_p
-        zonal_v = zonal_v[:,:36]#redefine_latField(zonal_v)
+        zonal_v = redefine_latField(zonal_v)
         
         lat = np.linspace(-90,90,36)
-        print (zonal_p[:,0])
         a = 3389920.
         g = 3.727
         temp = np.zeros((52,36))
         for j in np.arange(temp.shape[1]):
-            for i in np.arange(1,temp.shape[0]):
-                temp[i,j] = 2*np.pi*(a/g)*np.cos(np.deg2rad(lat[j]))*zonal_p[0,j]*np.trapz(zonal_v[:i,j][::-1],zonal_p[:i,j][::-1])
+            temp[:,j] = 2*np.pi*(a/g)*np.cos(np.deg2rad(lat[j]))*scipy.integrate.cumtrapz(zonal_v[:,j][::-1],zonal_p[:,j][::-1], initial=0)#zonal_p[0,j])
+#        for j in np.arange(temp.shape[1]):
+#            for i in np.arange(1,temp.shape[0]):
+#                temp[i,j] = 2*np.pi*(a/g)*np.cos(np.deg2rad(lat[j]))*scipy.integrate.cumtrapz(zonal_v[:i,j][::-1],zonal_p[:i,j][::-1])
         msf[k] = temp
     
     zonal_plt_monthly(p_field, ls, msf, 'Mean Meridional Streamfunction',  'viridis')
+#    plt.contourf(msf[1])
+
     
 #    
-#directory = './test_data/reduction_mcd_wbm/'
-#with PdfPages(directory+'test.pdf') as pdFfigures:   
-#    msf('./test_data/reduction_no_dust_wbm/')
+directory = './test_data/reduction/'
+#msf(directory)
+with PdfPages(directory+'test.pdf') as pdFfigures:   
+    msf(directory)
 
 def net_hr_aer(filename, ls1, ls2):
     nc_file = filename
