@@ -1,6 +1,7 @@
 import numpy as np
 #from netCDF4 import Dataset
-import dwell.fft as fft
+from mpi4py import MPI
+#import dwell.fft as fft
 import matplotlib
 matplotlib.use('Agg')
 #import matplotlib
@@ -14,6 +15,15 @@ import glob
 import sys
 
 matplotlib.rcParams.update({'font.size': 9})
+
+directory = './test_data/reduction_mcd_kdm/'
+
+main_function = str(sys.argv[1])
+
+#def __init__(self):
+#    self.comm = MPI.COMM_WORLD
+#    self.rank = self.comm.Get_rank()
+#    self.size = self.comm.Get_size()
 
 def find_ls_idx(ls_arr, ls):
     idx = (np.abs(ls_arr-ls)).argmin() # finding index corresponding to wanted solar long
@@ -36,10 +46,57 @@ def redefine_latField(v):
             if i ==0 : print (j,v[i,j],v[i,j+1],temp[i,j] )
     return temp
 
+def spect_v(ls, data, month_idx, tstep, lonstep, filt):
+    tstep = tstep/1440.
+    
+    padd = np.zeros((data.shape[0]*2, data.shape[1]*2))
+    padd[:data.shape[0], :data.shape[1]] = data
+        
+    padFFT = np.fft.fftshift(np.fft.fft2(padd))
+    c = np.fft.fftshift(np.fft.fftfreq(padFFT.shape[0], tstep))
+    waven = np.fft.fftshift(np.fft.fftfreq(padFFT.shape[1], lonstep))*360
+    
+    idx1 = np.where(abs(c>0.75)|abs(c<0.03))[0]
+    idx2 = np.where(abs(waven<1))[0]
+    
+    if filt:
+        # set everything that satisfy condition as zero, ie only filtering storm system
+        padFFT[idx1][idx2] = 0.
+        pad = np.fft.ifft2(np.fft.ifftshift(padFFT))
+        
+    lon = np.linspace(0,360,72)
+    lon, ls = np.meshgrid(lon, ls)
+    
+    lat = np.linspace(-90,90,36)
+    
+#    plt.figure(figsize=(15,4))
+#    plt.subplot(1,3,1)
+#    plt.contourf(lon, ls, data)
+#    plt.ylabel('Solar Longitude')
+#    plt.xlabel('Longitude')
+#    plt.title('HD PSFC LS {}-{}'.format(month_idx*30, (month_idx+1)*30))
+#    
+#    plt.subplot(1,3,2)
+#    plt.contourf(c, waven[72:83], np.log10(np.abs(padFFT)**2).T[72:83], cmap='inferno')
+#    plt.ylabel('Wavenumber')
+#    plt.xlabel('Cycles/sol')
+#    plt.title(r'Amplitude of FFT of HD LS {}-{}'.format((month_idx*30), ((month_idx+1)*30)))
+        
+#    plt.contourf(np.abs(pad)**2)
+    filtered_psfc = np.abs(pad[:data.shape[0], :data.shape[1]])**2
+#    plt.subplot(1,3,3)
+#    plt.contourf(lon, ls, filtered_psfc)
+#    plt.ylabel('Solar Longitude')
+#    plt.xlabel('Longitude')
+#    plt.title('Filtered HD PSFC LS {}-{}'.format(month_idx*30, (month_idx+1)*30))
+#    plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=1200)
+#    plt.close()
+    
+    return filtered_psfc.mean(axis=1)
+
 def zonal_plt_monthly(ydata, ls, data, title,  cmap):
     fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(20,14))
     for i, ax in enumerate(axes.flat):
-        print(i)
         y = ydata[i-1][4:]
         
         #press2 = zonal_p[i-1].mean(axis=1)
@@ -78,7 +135,7 @@ def basemap_plt_monthly(data, ls, title, cmap):
         ax.set_title(r'Avg {} LS {}-{} at 2 Pa'.format((title), (i)*30, (i+1)*30))
         
     fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
-    plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=600)
+    plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=1200)
 
 def zonal_avg(filedir, month, ls2):
     print ('Looking at zonal avg')
@@ -170,11 +227,11 @@ def zonal_diff(filedir, var1, var2):
         im = ax.contourf(t_ls, t_lat, amplitude, cmap='viridis')
         ax.set_title(r'm = {}'.format(i))
     fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.06)
-    plt.savefig('wavenumber_timeseries_tdiff.png', bbox_inches='tight', dpi=600)
+    plt.savefig(filedir+'wavenumber_timeseries_tdiff.pdf', bbox_inches='tight', dpi=1200)
     
-    zonal_t_d = martians_month(ls, t_d, True)
-    zonal_t_2P = martians_month(ls, t_d_2Pa, True)
-    zonal_p = martians_month(ls, p, True)
+    zonal_t_d = martians_month(ls, t_d)
+    zonal_t_2P = martians_month(ls, t_d_2Pa)
+    zonal_p = martians_month(ls, p)
     
     print ('Saving 2nd shit')
     zonal_plt_monthly(zonal_p, ls, zonal_t_d, 'T$_{\mathrm{'+name+'}}$', 'viridis')
@@ -182,77 +239,64 @@ def zonal_diff(filedir, var1, var2):
     print ('Saving 3rd cool shit')
     basemap_plt_monthly(zonal_t_2P, ls, 'T$_{\mathrm{'+name+'}}$', 'viridis')
 
-#pdFfigures = PdfPages('test.pdf')
 #directory = './test_data/reduction_no_dust_wbm/'
 #with PdfPages(directory+'figures.pdf') as pdFfigures:
 #    zonal_avg(directory,12,2)
 #    zonal_diff(directory, '*_t_d.npy', '*_t_d_2Pa.npy')
 #    zonal_diff(directory, '*_t_a.npy', '*_t_a_2Pa.npy')
 
-def fft_hovmoller(filedir):
-    print ('Looking at spectral of surface presssure')
-    
-    filepath = glob.glob(filedir + '*0_psfc.npy')[0]
-    print (filepath)
-    psfc = np.load(filepath)
-    
-    filepath = glob.glob(filedir + '*_ls_psfc.npy')[0]
-    print (filepath)
-    ls = np.load(filepath)
-    
-    idx1 = np.where(ls == 360)[0][1] # only looking at the second year
-    idx2 = np.where(ls == 360)[0][2]
-    ls = ls[idx1:idx2]
-    psfc = psfc[idx1:idx2]
-    
-    #avging for specific latitude
-    lat = np.linspace(-90,90,36)
-#    idx = np.where((lat>-10)&(lat<10))[0]
-    
-    surface_press = psfc[:,18,:]#.mean(axis=1)
-    
-    for i in np.arange(0,12):
-        idx = np.where((ls>i*30)&(ls<(i+1)*30))[0]
-        print (i*30, (i+1)*30)
-        ls_temp = ls[idx]
-        psfc = surface_press[idx] - surface_press[idx].mean(axis=0)
-        print (idx, surface_press[idx].mean(axis=0).shape)
-    
-        lon = np.linspace(0,360,72)
-        lon, ls_temp = np.meshgrid(lon, ls_temp)
+class FFT_filter:
+    def __init__(self, directory):
+        self.comm = MPI.COMM_WORLD
+        self.rank = self.comm.Get_rank()
+        self.size = self.comm.Get_size()
         
-        plt.figure(figsize=(10,4))
-        plt.subplot(1,2,1)
-        plt.contourf(lon, ls_temp, psfc)
-        plt.ylabel('Solar Longitude')
-        plt.xlabel('Longitude')
-        plt.title('{} Diagram PSFC LS {}-{}'.format(('Hovm$_a$'), i*30, (i+1)*30))
-    
+        self.hovmoller(directory)
+        
+    def hovmoller(self, filedir):
+#        print ('Looking at spectral of surface presssure')
+        
+        filepath = glob.glob(filedir + '*0_psfc.npy')[0]
+#        print (filepath)
+        psfc = np.load(filepath)
+        
+        filepath = glob.glob(filedir + '*_ls_psfc.npy')[0]
+#        print (filepath)
+        ls = np.load(filepath)
+        
+        idx1 = np.where(ls == 360)[0][1] # only looking at the second year
+        idx2 = np.where(ls == 360)[0][2]
+        ls = ls[idx1:idx2]
+        psfc = psfc[idx1:idx2]
+        
+        #avging for specific latitude
         lat = np.linspace(-90,90,36)
-    
-        plt.subplot(1,2,2)
-        ampl, phase, cycle, waven = fft.spec(psfc, 1./8, 1./72, axes=[0,1])
-    
-        padd = np.zeros((psfc.shape[0]*2, psfc.shape[1]*2))
-        padd[:psfc.shape[0], :psfc.shape[1]] = psfc
-        amplt = np.fft.fftshift(np.fft.fft2(padd))
-        amplt = np.abs(amplt)**2
-        c = np.fft.fftshift(np.fft.fftfreq(amplt.shape[0], .125))
-        wavenu = np.fft.fftshift(np.fft.fftfreq(amplt.shape[1],2.51748252))[72:83]*360
-    #    cycle, wavenu = np.meshgrid(cycle, wavenu)
-        amplt = np.log10(amplt).T[72:83]
         
-#        plt.contourf(cycle, waven[:5], np.log10(ampl).T[:5])
-        plt.contourf(c, wavenu, amplt, cmap='inferno',vmin=0,vmax=12)
-        plt.colorbar()
-        plt.ylabel('Wavenumber')
-        plt.xlabel('Cycles/sol')
-        plt.title(r'Amplitude of FFT of {} Diagram LS {}-{}'.format('Hovm$_a$', (i*30), ((i+1)*30)))
-        plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=1200)
+        sfc_storm = np.zeros((ls.size, self.size))
+        surface_press = psfc[:, self.rank, :]
+        
+        for j in np.arange(0,12):
+            if self.rank==0: print('Looking at month ', j+1)
+            idx = np.where((ls>j*30)&(ls<(j+1)*30))[0]
+            ls_temp = ls[idx]
+            psfc_temp = surface_press[idx] - surface_press[idx].mean(axis=0)
+    #        ampl, phase, cycle, waven = fft.spec(psfc, 1./8, 1./72, axes=[0,1])
 
-#directory = './test_data/reduction/'
-#with PdfPages(directory+'hovmoller.pdf') as pdFfigures:
-#    fft_hovmoller(directory)
+            temp = spect_v(ls_temp, psfc_temp, j,  180., 5., True)
+            
+            main = np.array(self.comm.gather(temp, root=0))
+            if self.rank == 0:
+                print (main.shape, sfc_storm[idx].shape)
+#                print (main)
+                sfc_storm[idx] = main[:].T
+                print (sfc_storm)
+        if self.rank == 0:
+            print (sfc_storm)
+            np.save('sfc_storm_system', sfc_storm)
+        
+if main_function == 'hovmoller':
+#        with PdfPages(directory+'hovmoller.pdf') as pdFfigures:
+    FFT_filter(directory)
 
 def msf(filedir):
     print ('Looking at zonal mean meridional function')
@@ -306,10 +350,9 @@ def msf(filedir):
 
     
 #    
-directory = './test_data/reduction/'
-#msf(directory)
-with PdfPages(directory+'test.pdf') as pdFfigures:   
-    msf(directory)
+#directory = './test_data/reduction_no_dust_wbm/'
+#with PdfPages(directory+'msf.pdf') as pdFfigures:   
+#    msf(directory)
 
 def net_hr_aer(filename, ls1, ls2):
     nc_file = filename
