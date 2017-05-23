@@ -145,21 +145,17 @@ def init_reduction(filedir):
                 data = Dataset(nc_file, mode='r')
 
                 psfc, ls_psfc = load_misc3D(nc_file, data, 'PSFC' )
-                tsk = load_misc3D(nc_file, data, 'TSK')[0]
             else:
                 nc_file = i
                 data = Dataset(nc_file, mode='r')
 
                 psfc2, ls_psfc2 = load_misc3D(nc_file, data, 'PSFC')
-                tsk2 = load_misc3D(nc_file, data, 'TSK')[0]
-                
                 psfc = np.concatenate((psfc, psfc2),axis=0)
-                tsk = np.concatenate((tsk, tsk2),axis=0)
                 ls_psfc = np.concatenate((ls_psfc, ls_psfc2),axis=0)
 
         filedir3 = i.replace('auxhist5','reduction/wrfout')
-        var_list = ['_psfc','_ls_psfc','tsk']
-        for num, i in enumerate([psfc,ls_psfc, tsk]):
+        var_list = ['_psfc','_ls_psfc']
+        for num, i in enumerate([psfc,ls_psfc]):
             print(psfc.shape)
             np.save(filedir3 + var_list[num], i)
 
@@ -169,10 +165,10 @@ def init_reduction(filedir):
     
     print (tar_cond)
     if tar_cond == 1:
-	tar = tarfile.open(filedir+'/reduction.tar.gz', 'w:gz')
+        tar = tarfile.open(filedir+'/reduction.tar.gz', 'w:gz')
         for i in glob.glob(filedir+'/reduction/wrfout*'):
-	    print ('Tarring file,', i)            
-	    tar.add(i, arcname = i.replace(filedir, ''))
-        tar.close()
-init_reduction('./../planetWRF/WRFV3/run/new_wbm')
+            print ('Tarring file,', i)            
+            tar.add(i, arcname = i.replace(filedir, ''))
+    tar.close()
+init_reduction('./../MarsWRF/diag.r14p1dust/data')
  

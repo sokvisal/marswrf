@@ -8,15 +8,15 @@ import matplotlib.pylab as plt
 import matplotlib.colors as colors
 from matplotlib.backends.backend_pdf import PdfPages
 #import matplotlib.tri as tri
-import scipy
+import scipy.integrate as integrate
 import os
 import glob
 import sys
 
 matplotlib.rcParams.update({'font.size': 9})
 
-directory = './test_data/reduction_mcd_kdm/'
-call_function = str(sys.argv[1])
+directory = str(sys.argv[1])
+call_function = str(sys.argv[2])
 
 def find_ls_idx(ls_arr, ls):
     idx = (np.abs(ls_arr-ls)).argmin() # finding index corresponding to wanted solar long
@@ -36,7 +36,6 @@ def redefine_latField(v):
     for i in np.arange(v.shape[0]):
         for j in np.arange(v.shape[1]-1):
             temp[i,j] = np.mean([v[i,j],v[i,j+1]])
-            if i ==0 : print (j,v[i,j],v[i,j+1],temp[i,j] )
     return temp
 
 def spect_v(ls, data, tstep, lonstep, filt):
@@ -46,44 +45,44 @@ def spect_v(ls, data, tstep, lonstep, filt):
     padd[:data.shape[0], :data.shape[1]] = data
     padd[:, 32:35] = 0
         
-    padFFT = np.fft.fftshift(np.fft.fft2(padd))
+    padFFT = np.fft.fftshift(np.fft.rfft2(padd))
     c = np.fft.fftshift(np.fft.fftfreq(padFFT.shape[0], tstep))
     waven = np.fft.fftshift(np.fft.fftfreq(padFFT.shape[1], lonstep))*360
     
-    idx1 = np.where((abs(c)>.75)|(abs(c)<0.033))[0]
-    idx2 = np.where((abs(waven)>1.5))[0]
+    idx1 = np.where((abs(c)>.75)|(abs(c)<0.03))[0]
+    idx2 = np.where((abs(waven)<0.1))[0]
 
 #     set everything that satisfy condition as zero, ie only filtering storm system
     padFFT[idx1] = 0.000001  
 
-    filtered2 = np.fft.ifft2(np.fft.ifftshift(padFFT))
-    filtered2 = filtered2 - filtered2.mean(axis=0)
+    filtered2 = np.fft.irfft2(np.fft.ifftshift(padFFT))
+    filtered2 = filtered2 #- filtered2.mean(axis=0)
     filtered = np.abs(filtered2[:data.shape[0], :data.shape[1]])**2
     
 #    ampl, phase, axis = fft.spec1d(filtered2, 1/72., use_axes = 1)
 #    print (ampl.shape)
 #    
-    if filt == 18:
-        plt.figure(1)
-        plt.contourf(np.log(np.abs(padFFT)**2)) 
-        plt.colorbar()
-        plt.savefig('test')
-        
-        plt.figure(2)
-        plt.contourf(filtered2)
-        plt.colorbar()
-        plt.savefig('test2')
-        
-        plt.figure(3)
-        plt.contourf(padd)
-        plt.colorbar()
-        plt.savefig('test3')
+#    if filt == 18:
+#        plt.figure(1)
+#        plt.contourf(np.log(np.abs(padFFT)**2)) 
+#        plt.colorbar()
+#        plt.savefig('test.pdf')
+#        
+#        plt.figure(2)
+#        plt.contourf(filtered)
+#        plt.colorbar()
+#        plt.savefig('test2.pdf')
+#        
+#        plt.figure(3)
+#        plt.contourf(padd)
+#        plt.colorbar()
+#        plt.savefig('test3.pdf')
 
     temp = filtered.mean(axis=1)
     return temp
 
 def zonal_plt_monthly(ydata, ls, data, title,  cmap):
-    fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(20,14))
+    fig, axes = plt.subplots(nrows=4, ncols=3, figsize=(14,20))
     for i, ax in enumerate(axes.flat):
         y = ydata[i-1][4:]
         
@@ -227,12 +226,6 @@ def zonal_diff(filedir, var1, var2):
     print ('Saving 3rd cool shit')
     basemap_plt_monthly(zonal_t_2P, ls, 'T$_{\mathrm{'+name+'}}$', 'viridis')
 
-#directory = './test_data/reduction_no_dust_wbm/'
-#with PdfPages(directory+'figures.pdf') as pdFfigures:
-#    zonal_avg(directory,12,2)
-#    zonal_diff(directory, '*_t_d.npy', '*_t_d_2Pa.npy')
-#    zonal_diff(directory, '*_t_a.npy', '*_t_a_2Pa.npy')
-
 class hovmoller:
     def __init__(self, directory):
         self.comm = MPI.COMM_WORLD
@@ -246,7 +239,7 @@ class hovmoller:
         
     def __main__(self, filedir):
         
-        filepath = glob.glob(filedir + '*tsk.npy')[0]
+        filepath = glob.glob(filedir + '*0_psfc.npy')[0]
         psfc = np.load(filepath)
         
         filepath = glob.glob(filedir + '*_ls_psfc.npy')[0]
@@ -263,7 +256,15 @@ class hovmoller:
             if self.rank == 0: print('Calculating latitudinal bins {}-{}'.format(i*self.size, (i+1)*self.size))
             surface_press = psfc[:, self.rank+(i*self.size), :]
             
-            psfc_temp = surface_press - surface_press.mean(axis=0).mean(axis=0)
+            psfc_temp = surface_press - surface_press.mean(axis=0)
+            
+#            if self.rank+(self.size*i) == 18:
+#                plt.figure(1)
+#                plt.contourf(surface_press)
+#                plt.savefig('sf.pdf')
+#                plt.figure(2)
+#                plt.contourf(psfc_temp)
+#                plt.savefig('p.pdf')
             
             temp = spect_v(ls, psfc_temp,  180., 5., self.rank+(self.size*i))
             
@@ -281,6 +282,8 @@ class hovmoller:
             ls = np.linspace(0,360,223)
             ls, lat = np.meshgrid(ls, lat)
             
+#            sfc_storm[np.where(sfc_storm>5)] = 0
+            
             print ('Saving plot')
             fig, ax = plt.subplots(figsize=(8,6))
             im = ax.contourf(ls, lat, sfc_storm, cmap='viridis')
@@ -288,10 +291,6 @@ class hovmoller:
             ax.set_ylabel('Latitude')
             ax.set_xlabel('Solar Longitude')
             plt.savefig(pdFfigures, format='pdf', bbox_inches='tight')
-        
-if call_function == 'hovmoller':
-    with PdfPages(directory+'hovmoller.pdf') as pdFfigures:
-        hovmoller(directory)
 
 def msf(filedir):
     print ('Looking at zonal mean meridional function')
@@ -314,15 +313,10 @@ def msf(filedir):
     p = p[idx1:idx2]
     v = v[idx1:idx2]
     ls = ls[idx1:idx2]
-    
-    
-    np.save('p.npy', p)
-    np.save('v.npy', v)
-    
 
     msf = np.zeros((12,52,36))
     p_field = np.zeros((12,52,36))
-    for k in range(0, 12):
+    for k in np.arange(0, 12):
     
         zonal_v = martians_month(ls, v)[k]
         zonal_p = martians_month(ls, p)[k]
@@ -334,20 +328,24 @@ def msf(filedir):
         g = 3.727
         temp = np.zeros((52,36))
         for j in np.arange(temp.shape[1]):
-            temp[:,j] = 2*np.pi*(a/g)*np.cos(np.deg2rad(lat[j]))*scipy.integrate.cumtrapz(zonal_v[:,j][::-1],zonal_p[:,j][::-1], initial=0)#zonal_p[0,j])
-#        for j in np.arange(temp.shape[1]):
-#            for i in np.arange(1,temp.shape[0]):
-#                temp[i,j] = 2*np.pi*(a/g)*np.cos(np.deg2rad(lat[j]))*scipy.integrate.cumtrapz(zonal_v[:i,j][::-1],zonal_p[:i,j][::-1])
+            temp[::-1,j] = 2*np.pi*(a/g)*np.cos(np.deg2rad(lat[j]))*integrate.cumtrapz(zonal_v[:,j][::-1],zonal_p[:,j][::-1], initial=0)
         msf[k] = temp
     
     zonal_plt_monthly(p_field, ls, msf, 'Mean Meridional Streamfunction',  'viridis')
-#    plt.contourf(msf[1])
 
-    
-#    
-#directory = './test_data/reduction_no_dust_wbm/'
-#with PdfPages(directory+'msf.pdf') as pdFfigures:   
-#    msf(directory)
+
+
+if call_function == 'misc':
+    with PdfPages(directory+'figures.pdf') as pdFfigures:
+        zonal_avg(directory,12,2)
+        zonal_diff(directory, '*_t_d.npy', '*_t_d_2Pa.npy')
+        zonal_diff(directory, '*_t_a.npy', '*_t_a_2Pa.npy')
+if call_function == 'msf':
+    with PdfPages(directory+'msf.pdf') as pdFfigures:   
+        msf(directory)
+if call_function == 'hovmoller':
+    with PdfPages(directory+'hovmoller.pdf') as pdFfigures:
+        hovmoller(directory)
 
 def net_hr_aer(filename, ls1, ls2):
     nc_file = filename
