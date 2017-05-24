@@ -31,6 +31,26 @@ def martians_month(ls, data):
     temp = np.array(temp)
     return temp
 
+def martians_year(ls, data):
+    idx = np.where(ls==360)[0]
+    idx0 = idx[0]
+    idx1 = idx[1]
+    idx2 = idx[2]   
+    idxn = idx[-1]
+    
+    shape2 = idx2 - idx1 
+    shape1 = idx1 - idx0
+    shapen = ls.size - idxn
+    
+    if shape2 != shape1:
+        zeros_data = np.zeros((shape2-shape1, data.shape[1], data.shape[2]))
+        data = np.concatenate((zeros_data, data), axis=0)
+    if shape2 != shapen:
+        zeros_data = np.zeros((shape2-shapen, data.shape[1], data.shape[2]))
+        data = np.concatenate((data, zeros_data), axis=0)
+    data = data.reshape((int(data.shape[0]/shape2), shape2, data.shape[1], data.shape[2]))
+    return data
+
 def redefine_latField(v):
     temp = np.zeros((52,36))
     for i in np.arange(v.shape[0]):
@@ -58,25 +78,6 @@ def spect_v(ls, data, tstep, lonstep, filt):
     filtered2 = np.fft.irfft2(np.fft.ifftshift(padFFT))
     filtered2 = filtered2 #- filtered2.mean(axis=0)
     filtered = np.abs(filtered2[:data.shape[0], :data.shape[1]])**2
-    
-#    ampl, phase, axis = fft.spec1d(filtered2, 1/72., use_axes = 1)
-#    print (ampl.shape)
-#    
-#    if filt == 18:
-#        plt.figure(1)
-#        plt.contourf(np.log(np.abs(padFFT)**2)) 
-#        plt.colorbar()
-#        plt.savefig('test.pdf')
-#        
-#        plt.figure(2)
-#        plt.contourf(filtered)
-#        plt.colorbar()
-#        plt.savefig('test2.pdf')
-#        
-#        plt.figure(3)
-#        plt.contourf(padd)
-#        plt.colorbar()
-#        plt.savefig('test3.pdf')
 
     temp = filtered.mean(axis=1)
     return temp
@@ -225,6 +226,55 @@ def zonal_diff(filedir, var1, var2):
         
     print ('Saving 3rd cool shit')
     basemap_plt_monthly(zonal_t_2P, ls, 'T$_{\mathrm{'+name+'}}$', 'viridis')
+    
+def msf(filedir):
+    print ('Looking at zonal mean meridional function')
+    
+    filepath = glob.glob(filedir + '*_v.npy')[0]
+    print (filepath)
+    v = np.load(filepath)
+    
+    filepath = glob.glob(filedir + '*_press.npy')[0]
+    print (filepath)
+    p = np.load(filepath)
+    
+    filepath = glob.glob(filedir + '*_ls.npy')[0]
+    print (filepath)
+    ls = np.load(filepath)
+    
+    idx1 = np.where(ls == 360)[0][1] # only looking at the second year
+    idx2 = np.where(ls == 360)[0][2]
+    
+    test = martians_year(ls, p)
+    print(test.shape)
+    
+    print (p.shape, v.shape)
+    for i in [p,v]:
+        i = martians_year(ls, i)
+        print (i.shape)
+    
+#    p = p[idx1:idx2]
+#    v = v[idx1:idx2]
+#    ls = ls[idx1:idx2]
+
+    msf = np.zeros((12,52,36))
+    p_field = np.zeros((12,52,36))
+    for k in np.arange(0, 12):
+    
+        zonal_v = martians_month(ls, v)[k]
+        zonal_p = martians_month(ls, p)[k]
+        p_field[k] = zonal_p
+        zonal_v = redefine_latField(zonal_v)
+        
+        lat = np.linspace(-90,90,36)
+        a = 3389920.
+        g = 3.727
+        temp = np.zeros((52,36))
+        for j in np.arange(temp.shape[1]):
+            temp[::-1,j] = 2*np.pi*(a/g)*np.cos(np.deg2rad(lat[j]))*integrate.cumtrapz(zonal_v[:,j][::-1],zonal_p[:,j][::-1], initial=0)
+        msf[k] = temp
+    
+    zonal_plt_monthly(p_field, ls, msf, 'Mean Meridional Streamfunction',  'viridis')
 
 class hovmoller:
     def __init__(self, directory):
@@ -291,48 +341,6 @@ class hovmoller:
             ax.set_ylabel('Latitude')
             ax.set_xlabel('Solar Longitude')
             plt.savefig(pdFfigures, format='pdf', bbox_inches='tight')
-
-def msf(filedir):
-    print ('Looking at zonal mean meridional function')
-    
-    filepath = glob.glob(filedir + '*_v.npy')[0]
-    print (filepath)
-    v = np.load(filepath)
-    
-    filepath = glob.glob(filedir + '*_press.npy')[0]
-    print (filepath)
-    p = np.load(filepath)
-    
-    filepath = glob.glob(filedir + '*_ls.npy')[0]
-    print (filepath)
-    ls = np.load(filepath)
-    
-    idx1 = np.where(ls == 360)[0][1] # only looking at the second year
-    idx2 = np.where(ls == 360)[0][2]
-    
-    p = p[idx1:idx2]
-    v = v[idx1:idx2]
-    ls = ls[idx1:idx2]
-
-    msf = np.zeros((12,52,36))
-    p_field = np.zeros((12,52,36))
-    for k in np.arange(0, 12):
-    
-        zonal_v = martians_month(ls, v)[k]
-        zonal_p = martians_month(ls, p)[k]
-        p_field[k] = zonal_p
-        zonal_v = redefine_latField(zonal_v)
-        
-        lat = np.linspace(-90,90,36)
-        a = 3389920.
-        g = 3.727
-        temp = np.zeros((52,36))
-        for j in np.arange(temp.shape[1]):
-            temp[::-1,j] = 2*np.pi*(a/g)*np.cos(np.deg2rad(lat[j]))*integrate.cumtrapz(zonal_v[:,j][::-1],zonal_p[:,j][::-1], initial=0)
-        msf[k] = temp
-    
-    zonal_plt_monthly(p_field, ls, msf, 'Mean Meridional Streamfunction',  'viridis')
-
 
 
 if call_function == 'misc':
