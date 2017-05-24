@@ -26,32 +26,41 @@ def find_ls_idx(ls_arr, ls):
 def martians_month(ls, data):
     temp = []
     for i in np.arange(0, 12):
-        idx = np.where((ls>i*30)&(ls<(i+1)*30))
+        idx = np.where((ls>i*30)&(ls<(i+1)*30))[0]
         temp.append(data[idx].mean(axis=0))
     temp = np.array(temp)
     return temp
 
 def martians_year(ls, data):
     idx = np.where(ls==360)[0]
-    idx0 = idx[0]
-    idx1 = idx[1]
-    idx2 = idx[2]   
-    idxn = idx[-1]
-    
-    shape2 = idx2 - idx1 
-    shape1 = idx1 - idx0
-    shapen = ls.size - idxn
-    print (shape1, shape2, shapen, data.shape)
-    
-    if shape2 != shape1:
-        zeros_data = np.zeros((shape2-shape1, data.shape[1], data.shape[2]))
-        data = np.concatenate((zeros_data, data), axis=0)
-    if shape2 != shapen:
-        zeros_data = np.zeros((shape2-shapen, data.shape[1], data.shape[2]))
-        data = np.concatenate((data, zeros_data), axis=0)
-    data = data.reshape((int(data.shape[0]/shape2), shape2, data.shape[1], data.shape[2]))
-
-    return data
+    if idx[0] != 0 and idx.size > 1:
+        idx0 = idx[0]
+        idx1 = idx[1]
+        return data[idx0:idx1]
+    elif idx[0] != 0 and idx.size == 1:
+        idx1 = idx[0]
+        return data[:idx1]
+    elif idx[0] == 0:
+        idx1 = idx[1]
+        idx2 = idx[2]
+        return data[idx1:idx2]
+        
+#    idx0 = idx[0]
+#    idx1 = idx[1]
+#    
+#    idxn = idx[-1]
+#    
+#    shape = idx1 - idx0
+#    shapen = ls.size - idxn
+#    
+#    if idx0 != 0:
+#        zeros_data = np.zeros((shape-idx0, data.shape[1], data.shape[2]))
+#        data = np.concatenate((zeros_data, data), axis=0)
+#    if shape != shapen:
+#        zeros_data = np.zeros((shape-shapen, data.shape[1], data.shape[2]))
+#        data = np.concatenate((data, zeros_data), axis=0)
+#    data = data.reshape((int(data.shape[0]/shape), shape, data.shape[1], data.shape[2]))
+#    return data
 
 def redefine_latField(v):
     temp = np.zeros((52,36))
@@ -87,7 +96,7 @@ def spect_v(ls, data, tstep, lonstep, filt):
 def zonal_plt_monthly(ydata, ls, data, title,  cmap):
     fig, axes = plt.subplots(nrows=4, ncols=3, figsize=(14,20))
     for i, ax in enumerate(axes.flat):
-        y = ydata[i-1][4:]
+        y = ydata[i][4:]
         
         #press2 = zonal_p[i-1].mean(axis=1)
         lat = np.linspace(-90, 90, 36) 
@@ -95,10 +104,11 @@ def zonal_plt_monthly(ydata, ls, data, title,  cmap):
         
         lat, temp_press = np.meshgrid(lat, temp_press)
         
-        d = data[i-1][4:]
+        d = data[i][4:]
         
         im = ax.contourf(lat, y, d, 12, cmap=cmap)
-        ax.contour(lat, y, d, 12, linewidths=0.5, colors='k')
+        if not np.isnan(d).any():
+            ax.contour(lat, y, d, 12, linewidths=0.5, colors='k')
         
         ax.set_title(r'{} LS {}-{}'.format((title), (i)*30, (i+1)*30))
         #ax.invert_yaxis()
@@ -110,18 +120,20 @@ def zonal_plt_monthly(ydata, ls, data, title,  cmap):
     plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=600)
 
 def basemap_plt_monthly(data, ls, title, cmap):
-    fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(20,14))
+    fig, axes = plt.subplots(nrows=4, ncols=3, figsize=(14,20))
     for i, ax in enumerate(axes.flat):
-        d = data[i-1]
+        d = data[i]
         
         #press2 = zonal_p[i-1].mean(axis=1)
         lat = np.linspace(-90, 90, 36) 
         lon = np.linspace(0, 360, 72)
         
         lon, lat = np.meshgrid(lon, lat)
+        
 
         im = ax.contourf(lon, lat, d, cmap='viridis')
-        ax.contour(lon, lat, d, linewidths=0.5, colors='black')
+        if not np.isnan(d).any():
+            ax.contour(lon, lat, d, linewidths=0.5, colors='black')
         ax.set_title(r'Avg {} LS {}-{} at 2 Pa'.format((title), (i)*30, (i+1)*30))
         
     fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
@@ -147,10 +159,10 @@ def zonal_avg(filedir, month, ls2):
     print (filepath)
     ls = np.load(filepath)
     
-    p = martians_year(ls, p) [1]
-    temp = martians_year(ls, temp) [1]
-    u = martians_year(ls, u) [1]
-    ls = np.linspace(0, 360, p.shape[0])
+    p = martians_year(ls, p)
+    temp = martians_year(ls, temp)
+    u = martians_year(ls, u)
+    ls = martians_year(ls, ls)
 
     zonal_t = martians_month(ls, temp)
     zonal_u = martians_month(ls, u)
@@ -163,6 +175,10 @@ def zonal_avg(filedir, month, ls2):
     zonal_plt_monthly(zonal_p, ls, zonal_u, 'Zonal Mean Wind', 'inferno')
 
 def zonal_diff(filedir, var1, var2):
+    '''     Use [::2] for visal's simulation
+            Use [7::8] for chris's r14p1
+    '''
+    
     if var1 == '*_t_d.npy': name = 'diff'
     else: name = 'avg'
     print ('Looking at thermal tides')
@@ -184,43 +200,48 @@ def zonal_diff(filedir, var1, var2):
     print (filepath)
     ls = np.load(filepath)[::2]
     
-    idx1 = np.where(ls == 360)[0][1] # only looking at the second year
-    idx2 = np.where(ls == 360)[0][2]
-    t_d_2Pa2 = t_d_2Pa[idx1:idx2]
-
+    filepath = glob.glob(filedir + '*_ls_aux9.npy')
+    if filepath:
+        filepath = filepath[0]
+        print (filepath)
+        ls_aux9 = np.load(filepath)
     
-    p = martians_year(ls, p) [1]
-    t_d = martians_year(ls, t_d) [1]
-    t_d_2Pa = martians_year(ls, t_d_2Pa) [1]
-    print (np.where((t_d_2Pa - t_d_2Pa2) != 0))
-    ls = np.linspace(0, 360, p.shape[0])
+        idx = np.where(ls_aux9[0] == ls)[0]
+        print (idx)
+        ls = ls[idx[0]:]
+        p = p[idx[0]:]
+
+    t_d = martians_year(ls, t_d)
+    t_d_2Pa = martians_year(ls, t_d_2Pa)
+    p = martians_year(ls, p)
+    ls = martians_year(ls,ls)
     
 #    test_diff = t_d_2Pa.reshape((223,3,36,72)).mean(axis=1)
-    ampl, phase, axis = fft.spec1d(t_d_2Pa, 1/72., use_axes = 2)
-    ampl = ampl
-    phase = phase
-    
-    # stacking the array with the respectful wavenumber
-    test = np.zeros((4,669,36)) # amplitude
-    test2 = np.zeros((4,669,36)) # phase
-    for j in np.arange(0,4):
-        for i in np.arange(0,669):
-            test[j,i] = ampl[i,:,j]
-            test2[j,i] = phase[i,:,j]
-    
-    print ('Plotting some cool shit')
-    print ('Saving 1st cool shit')
-    lat = np.linspace(-90, 90, 36) 
-    ls = np.linspace(0,360, 669)
-    t_lat, t_ls = np.meshgrid(lat, ls)
-    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(8,8))
-    for i, ax in enumerate(axes.flat):
-        amplitude = test[i]
-        phase = test2[i]
-        im = ax.contourf(t_ls, t_lat, amplitude, cmap='viridis')
-        ax.set_title(r'm = {}'.format(i))
-    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.06)
-    plt.savefig(filedir+'wavenumber_timeseries_tdiff.pdf', bbox_inches='tight', dpi=1200)
+#    ampl, phase, axis = fft.spec1d(t_d_2Pa, 1/72., use_axes = 2)
+#    ampl = ampl
+#    phase = phase
+#    
+#    # stacking the array with the respectful wavenumber
+#    test = np.zeros((4,669,36)) # amplitude
+#    test2 = np.zeros((4,669,36)) # phase
+#    for j in np.arange(0,4):
+#        for i in np.arange(0,669):
+#            test[j,i] = ampl[i,:,j]
+#            test2[j,i] = phase[i,:,j]
+#    
+#    print ('Plotting some cool shit')
+#    print ('Saving 1st cool shit')
+#    lat = np.linspace(-90, 90, 36) 
+#    ls = np.linspace(0,360, 669)
+#    t_lat, t_ls = np.meshgrid(lat, ls)
+#    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(8,8))
+#    for i, ax in enumerate(axes.flat):
+#        amplitude = test[i]
+#        phase = test2[i]
+#        im = ax.contourf(t_ls, t_lat, amplitude, cmap='viridis')
+#        ax.set_title(r'm = {}'.format(i))
+#    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.06)
+#    plt.savefig(filedir+'wavenumber_timeseries_tdiff.pdf', bbox_inches='tight', dpi=1200)
     
     zonal_t_d = martians_month(ls, t_d)
     zonal_t_2P = martians_month(ls, t_d_2Pa)
@@ -339,7 +360,7 @@ class hovmoller:
 
 if call_function == 'misc':
     with PdfPages(directory+'figures.pdf') as pdFfigures:
-#        zonal_avg(directory,12,2)
+        zonal_avg(directory,12,2)
         zonal_diff(directory, '*_t_d.npy', '*_t_d_2Pa.npy')
         zonal_diff(directory, '*_t_a.npy', '*_t_a_2Pa.npy')
 if call_function == 'msf':
