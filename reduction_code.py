@@ -50,6 +50,8 @@ def load_misc(filename, data, var_name):
     
     var2 = var_name + '_PHY_PM'
     t_pm = data.variables[var2][:] # solar long
+    
+    ls = data.variables['L_S'][:]
 
     t_d = t_pm.mean(axis=3) - t_am.mean(axis=3)
     t_a = t_pm.mean(axis=3) + t_am.mean(axis=3) 
@@ -57,7 +59,7 @@ def load_misc(filename, data, var_name):
     t_d_2pa = t_pm[:,42,:,:] - t_am[:,42,:,:]
     t_a_2pa = t_pm[:,42,:,:] + t_am[:,42,:,:]
 
-    return t_a/2., t_d/2.,  t_a_2pa/2., t_d_2pa/2.
+    return t_a/2., t_d/2.,  t_a_2pa/2., t_d_2pa/2., ls
 
 def load_misc2D(filename, data, var_name):
     temp = data.variables[var_name][:].mean(axis=3)
@@ -117,22 +119,24 @@ def init_reduction(filedir):
                 nc_file = i
                 data = Dataset(nc_file, mode='r')
 		
-                t_a, t_d, t_a_2Pa, t_d_2Pa = load_misc(nc_file, data, 'T' )
+                t_a, t_d, t_a_2Pa, t_d_2Pa, ls = load_misc(nc_file, data, 'T' )
             else: 
                 nc_file = i
                 data = Dataset(nc_file, mode='r')
 		
-                t_a2, t_d2, t_a2_2Pa, t_d2_2Pa = load_misc(nc_file, data, 'T')
+                t_a2, t_d2, t_a2_2Pa, t_d2_2Pa, ls2 = load_misc(nc_file, data, 'T')
                 
                 t_a = np.concatenate((t_a, t_a2),axis=0)
                 t_d = np.concatenate((t_d, t_d2),axis=0)
                 
                 t_a_2Pa = np.concatenate((t_a_2Pa, t_a2_2Pa),axis=0)
                 t_d_2Pa = np.concatenate((t_d_2Pa, t_d2_2Pa),axis=0)
+                
+                ls = np.concatenate((ls, ls2), axis=0)
 	
         filedir3 = i.replace('auxhist9','reduction/wrfout')        
-        var_list = ['_t_a', '_t_d', '_t_a_2Pa', '_t_d_2Pa']
-        for num, i in enumerate([t_a, t_d, t_a_2Pa, t_d_2Pa]):
+        var_list = ['_t_a', '_t_d', '_t_a_2Pa', '_t_d_2Pa', '_ls_aux9']
+        for num, i in enumerate([t_a, t_d, t_a_2Pa, t_d_2Pa, ls]):
             np.save(filedir3 + var_list[num], i)
  
     def auxhist5():    
@@ -169,6 +173,6 @@ def init_reduction(filedir):
         for i in glob.glob(filedir+'/reduction/wrfout*'):
             print ('Tarring file,', i)            
             tar.add(i, arcname = i.replace(filedir, ''))
-    tar.close()
-init_reduction('./../MarsWRF/diag.r14p1dust/data')
+            tar.close()
+init_reduction('./../MarsWRF/diag.r14p1dustL45/')
  
