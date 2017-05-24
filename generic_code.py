@@ -41,6 +41,7 @@ def martians_year(ls, data):
     shape2 = idx2 - idx1 
     shape1 = idx1 - idx0
     shapen = ls.size - idxn
+    print (shape1, shape2, shapen, data.shape)
     
     if shape2 != shape1:
         zeros_data = np.zeros((shape2-shape1, data.shape[1], data.shape[2]))
@@ -49,6 +50,7 @@ def martians_year(ls, data):
         zeros_data = np.zeros((shape2-shapen, data.shape[1], data.shape[2]))
         data = np.concatenate((data, zeros_data), axis=0)
     data = data.reshape((int(data.shape[0]/shape2), shape2, data.shape[1], data.shape[2]))
+
     return data
 
 def redefine_latField(v):
@@ -142,15 +144,13 @@ def zonal_avg(filedir, month, ls2):
     p = np.load(filepath)
         
     filepath = glob.glob(filedir + '*_ls.npy')[0]
-    ls = np.load(filepath)[::2]
-
-    idx1 = np.where(ls == 360)[0][1] # only looking at the second year
-    idx2 = np.where(ls == 360)[0][2]
+    print (filepath)
+    ls = np.load(filepath)
     
-    ls = ls[idx1:idx2]
-    temp = temp[idx1:idx2]
-    u = u[idx1:idx2]
-    p = p[idx1:idx2]
+    p = martians_year(ls, p) [1]
+    temp = martians_year(ls, temp) [1]
+    u = martians_year(ls, u) [1]
+    ls = np.linspace(0, 360, p.shape[0])
 
     zonal_t = martians_month(ls, temp)
     zonal_u = martians_month(ls, u)
@@ -169,26 +169,31 @@ def zonal_diff(filedir, var1, var2):
     
     filepath = glob.glob(filedir + '*_press.npy')[0]
     print (filepath)
-    p = np.load(filepath)
+    p = np.load(filepath)[::2]
 
     filepath = glob.glob(filedir + var1)[0]
+    print (filepath)
     t_d = np.load(filepath)
-    t_d = t_d
     
     filepath = glob.glob(filedir + var2)[0]
+    print (filepath)
     t_d_2Pa = np.load(filepath)
-    t_d_2Pa = t_d_2Pa 
+    print (t_d_2Pa.shape)
     
     filepath = glob.glob(filedir + '*_ls.npy')[0]
+    print (filepath)
     ls = np.load(filepath)[::2]
-
+    
     idx1 = np.where(ls == 360)[0][1] # only looking at the second year
     idx2 = np.where(ls == 360)[0][2]
+    t_d_2Pa2 = t_d_2Pa[idx1:idx2]
+
     
-    ls = ls[idx1:idx2]
-    t_d = t_d[idx1:idx2]
-    t_d_2Pa = t_d_2Pa[idx1:idx2]
-    p = p[idx1:idx2]
+    p = martians_year(ls, p) [1]
+    t_d = martians_year(ls, t_d) [1]
+    t_d_2Pa = martians_year(ls, t_d_2Pa) [1]
+    print (np.where((t_d_2Pa - t_d_2Pa2) != 0))
+    ls = np.linspace(0, 360, p.shape[0])
     
 #    test_diff = t_d_2Pa.reshape((223,3,36,72)).mean(axis=1)
     ampl, phase, axis = fft.spec1d(t_d_2Pa, 1/72., use_axes = 2)
@@ -241,22 +246,11 @@ def msf(filedir):
     filepath = glob.glob(filedir + '*_ls.npy')[0]
     print (filepath)
     ls = np.load(filepath)
-    
-    idx1 = np.where(ls == 360)[0][1] # only looking at the second year
-    idx2 = np.where(ls == 360)[0][2]
-    
-    test = martians_year(ls, p)
-    print(test.shape)
-    
-    print (p.shape, v.shape)
-    for i in [p,v]:
-        i = martians_year(ls, i)
-        print (i.shape)
-    
-#    p = p[idx1:idx2]
-#    v = v[idx1:idx2]
-#    ls = ls[idx1:idx2]
 
+    p = martians_year(ls, p) [1]
+    v = martians_year(ls, v) [1]
+    ls = np.linspace(0, 360, p.shape[0])
+    
     msf = np.zeros((12,52,36))
     p_field = np.zeros((12,52,36))
     for k in np.arange(0, 12):
@@ -345,7 +339,7 @@ class hovmoller:
 
 if call_function == 'misc':
     with PdfPages(directory+'figures.pdf') as pdFfigures:
-        zonal_avg(directory,12,2)
+#        zonal_avg(directory,12,2)
         zonal_diff(directory, '*_t_d.npy', '*_t_d_2Pa.npy')
         zonal_diff(directory, '*_t_a.npy', '*_t_a_2Pa.npy')
 if call_function == 'msf':
