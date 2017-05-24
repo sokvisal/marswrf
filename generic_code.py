@@ -32,6 +32,7 @@ def martians_month(ls, data):
     return temp
 
 def martians_year(ls, data):
+    #### only looking at "second year"
     idx = np.where(ls==360)[0]
     if idx[0] != 0 and idx.size > 1:
         idx0 = idx[0]
@@ -93,7 +94,7 @@ def spect_v(ls, data, tstep, lonstep, filt):
     temp = filtered.mean(axis=1)
     return temp
 
-def zonal_plt_monthly(ydata, ls, data, title,  cmap):
+def zonal_plt_monthly(ydata, ls, data, title, level, cmap):
     fig, axes = plt.subplots(nrows=4, ncols=3, figsize=(14,20))
     for i, ax in enumerate(axes.flat):
         y = ydata[i][4:]
@@ -106,18 +107,19 @@ def zonal_plt_monthly(ydata, ls, data, title,  cmap):
         
         d = data[i][4:]
         
-        im = ax.contourf(lat, y, d, 12, cmap=cmap)
+        im = ax.contourf(lat, y, d, levels=level, cmap=cmap, extend='both')
         if not np.isnan(d).any():
-            ax.contour(lat, y, d, 12, linewidths=0.5, colors='k')
+            ax.contour(lat, y, d, levels=level, linewidths=0.5, colors='k', extend='both')
         
         ax.set_title(r'{} LS {}-{}'.format((title), (i)*30, (i+1)*30))
-        #ax.invert_yaxis()
+        if i in [0,3,6,9]: ax.set_ylabel('Pressure (Pa)')
+        if i in [9,10,11]: ax.set_xlabel('Latitude ($^\circ$)')
         ax.set_yscale('log')
         ax.set_ylim([900, 1e-2])
         
 #        print ('Saving 1st cool shit')
     fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
-    plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=600)
+    plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=800)
 
 def basemap_plt_monthly(data, ls, title, cmap):
     fig, axes = plt.subplots(nrows=4, ncols=3, figsize=(14,20))
@@ -129,7 +131,6 @@ def basemap_plt_monthly(data, ls, title, cmap):
         lon = np.linspace(0, 360, 72)
         
         lon, lat = np.meshgrid(lon, lat)
-        
 
         im = ax.contourf(lon, lat, d, cmap='viridis')
         if not np.isnan(d).any():
@@ -137,7 +138,7 @@ def basemap_plt_monthly(data, ls, title, cmap):
         ax.set_title(r'Avg {} LS {}-{} at 2 Pa'.format((title), (i)*30, (i+1)*30))
         
     fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
-    plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=1200)
+    plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=800)
 
 def zonal_avg(filedir, month, ls2):
     print ('Looking at zonal avg')
@@ -170,46 +171,44 @@ def zonal_avg(filedir, month, ls2):
     
     print ('Plotting some cool shit')
     print ('Saving 1st shit')
-    zonal_plt_monthly(zonal_p, ls, zonal_t, 'Zonal Mean Temp', 'viridis')
+    zonal_plt_monthly(zonal_p, ls, zonal_t, 'Zonal Mean Temp', np.linspace(110,240,12), 'viridis')
     print ('Saving 2nd shit')
-    zonal_plt_monthly(zonal_p, ls, zonal_u, 'Zonal Mean Wind', 'inferno')
+    zonal_plt_monthly(zonal_p, ls, zonal_u, 'Zonal Mean Wind', np.linspace(-140,150,12), 'inferno')
 
 def zonal_diff(filedir, var1, var2):
     '''     Use [::2] for visal's simulation
             Use [7::8] for chris's r14p1
     '''
     
-    if var1 == '*_t_d.npy': name = 'diff'
-    else: name = 'avg'
+    if var1 == '*_t_d.npy': 
+        name = 'diff'
+        level = np.linspace(-16,20,12)
+    else: 
+        name = 'avg'
+        level = np.linspace(120,230,12)
     print ('Looking at thermal tides')
     
     filepath = glob.glob(filedir + '*_press.npy')[0]
-    print (filepath)
-    p = np.load(filepath)[::2]
+    p = np.load(filepath)[7::8]
 
     filepath = glob.glob(filedir + var1)[0]
-    print (filepath)
     t_d = np.load(filepath)
     
     filepath = glob.glob(filedir + var2)[0]
-    print (filepath)
     t_d_2Pa = np.load(filepath)
     print (t_d_2Pa.shape)
     
     filepath = glob.glob(filedir + '*_ls.npy')[0]
-    print (filepath)
-    ls = np.load(filepath)[::2]
+    ls = np.load(filepath)[7::8]
     
     filepath = glob.glob(filedir + '*_ls_aux9.npy')
     if filepath:
         filepath = filepath[0]
-        print (filepath)
         ls_aux9 = np.load(filepath)
     
-        idx = np.where(ls_aux9[0] == ls)[0]
-        print (idx)
-        ls = ls[idx[0]:]
-        p = p[idx[0]:]
+    idx = np.where(ls_aux9[0] == ls)[0]
+    ls = ls[idx[0]:]
+    p = p[idx[0]:]
 
     t_d = martians_year(ls, t_d)
     t_d_2Pa = martians_year(ls, t_d_2Pa)
@@ -248,29 +247,27 @@ def zonal_diff(filedir, var1, var2):
     zonal_p = martians_month(ls, p)
     
     print ('Saving 2nd shit')
-    zonal_plt_monthly(zonal_p, ls, zonal_t_d, 'T$_{\mathrm{'+name+'}}$', 'viridis')
+    zonal_plt_monthly(zonal_p, ls, zonal_t_d, 'T$_{\mathrm{'+name+'}}$', level, 'viridis')
         
-    print ('Saving 3rd cool shit')
-    basemap_plt_monthly(zonal_t_2P, ls, 'T$_{\mathrm{'+name+'}}$', 'viridis')
+#    print ('Saving 3rd cool shit')
+#    basemap_plt_monthly(zonal_t_2P, ls, 'T$_{\mathrm{'+name+'}}$', 'viridis')
     
 def msf(filedir):
     print ('Looking at zonal mean meridional function')
     
     filepath = glob.glob(filedir + '*_v.npy')[0]
-    print (filepath)
     v = np.load(filepath)
     
     filepath = glob.glob(filedir + '*_press.npy')[0]
-    print (filepath)
     p = np.load(filepath)
     
     filepath = glob.glob(filedir + '*_ls.npy')[0]
-    print (filepath)
     ls = np.load(filepath)
 
-    p = martians_year(ls, p) [1]
-    v = martians_year(ls, v) [1]
-    ls = np.linspace(0, 360, p.shape[0])
+    p = martians_year(ls, p)
+    v = martians_year(ls, v)
+    ls = martians_year(ls, ls)
+    #np.linspace(0, 360, p.shape[0])
     
     msf = np.zeros((12,52,36))
     p_field = np.zeros((12,52,36))
@@ -289,7 +286,8 @@ def msf(filedir):
             temp[::-1,j] = 2*np.pi*(a/g)*np.cos(np.deg2rad(lat[j]))*integrate.cumtrapz(zonal_v[:,j][::-1],zonal_p[:,j][::-1], initial=0)
         msf[k] = temp
     
-    zonal_plt_monthly(p_field, ls, msf, 'Mean Meridional Streamfunction',  'viridis')
+    norm = matplotlib.colors.Normalize(vmin=-1.,vmax=1.)
+    zonal_plt_monthly(p_field, ls, msf, 'Mean Meridional Streamfunction', np.logspace(-1.2e9, 4e9, 12), 'viridis')
 
 class hovmoller:
     def __init__(self, directory):
@@ -304,17 +302,14 @@ class hovmoller:
         
     def __main__(self, filedir):
         
-        filepath = glob.glob(filedir + '*0_psfc.npy')[0]
+        filepath = glob.glob(filedir + '*4_psfc.npy')[0]
         psfc = np.load(filepath)
         
         filepath = glob.glob(filedir + '*_ls_psfc.npy')[0]
-        ls = np.load(filepath)
+        ls = np.load(filepath)  
         
-        idx1 = np.where(ls == 360)[0][1] # only looking at the second year
-        idx2 = np.where(ls == 360)[0][2]
-        ls = ls[idx1:idx2]
-        psfc = psfc[idx1:idx2]
-        
+        ls = martians_year(ls, ls)
+        psfc = martians_year(ls, psfc)
         
         sfc_storm = np.zeros((self.size*self.runs, ls.size), complex)
         for i in np.arange(0, self.runs):
