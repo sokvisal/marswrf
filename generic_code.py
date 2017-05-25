@@ -82,24 +82,18 @@ def spect_v(ls, data, tstep, lonstep, filt):
     waven = np.fft.fftshift(np.fft.fftfreq(padFFT.shape[1], lonstep))*360
     
     idx1 = np.where((abs(c)>0.75)|(abs(c)<0.03))[0]
+    wave1_idx = np.where(waven!=3)[0]
     idx2 = np.where((abs(c)<0.75)&(abs(c)>0.03))[0]
     
-
 #     set everything that satisfy condition as zero, ie only filtering storm system
     padFFT[idx1] = 0
-#    size = int(idx2.size/2)
-#    hann = signal.hanning(size, True)
-#    print (idx2[239:241])
-#    hann = np.repeat(hann, 144).reshape((size, 144))
-#    
-#    padFFT[idx2][:size] = padFFT[idx2][:size]*hann
-#    padFFT[idx2][size:] = padFFT[idx2][size:]*hann
-          
-    if filt == 18:
-        plt.figure(figsize=(20,20))
-        plt.contourf(padFFT)
-        plt.colorbar()
-        plt.savefig('test.pdf', dpi=800)
+    size = int(idx2.size/2)
+    hann = signal.hanning(size, True)
+    print (idx2[239:241])
+    hann = np.repeat(hann, 72).reshape((size, 72))
+    
+    padFFT[idx2][:size] = padFFT[idx2][:size]*hann
+    padFFT[idx2][size:] = padFFT[idx2][size:]*hann
 
     filtered2 = np.fft.ifft2(np.fft.ifftshift(padFFT, axes=[0]), axes=[0])
     filtered = np.abs(filtered2[:data.shape[0], :data.shape[1]])**2
@@ -120,9 +114,9 @@ def zonal_plt_monthly(ydata, ls, data, title, level, cmap):
         
         d = data[i][4:]
         
-        im = ax.contourf(lat, y, d, 12, cmap=cmap, extend='both')
+        im = ax.contourf(lat, y, d, levels=level, cmap=cmap, extend='both')
         if not np.isnan(d).any():
-            ax.contour(lat, y, d, 12, linewidths=0.5, colors='k', extend='both')
+            ax.contour(lat, y, d, levels=level, linewidths=0.5, colors='k', extend='both')
         
         ax.set_title(r'{} LS {}-{}'.format((title), (i)*30, (i+1)*30))
         if i in [0,3,6,9]: ax.set_ylabel('Pressure (Pa)')
@@ -184,9 +178,9 @@ def zonal_avg(filedir, month, ls2):
     
     print ('Plotting some cool shit')
     print ('Saving 1st shit')
-    zonal_plt_monthly(zonal_p, ls, zonal_t, 'Zonal Mean Temp', np.linspace(110,240,12), 'viridis')
+    zonal_plt_monthly(zonal_p, ls, zonal_t, 'Zonal Mean Temp', np.linspace(110,240,14), 'viridis')
     print ('Saving 2nd shit')
-    zonal_plt_monthly(zonal_p, ls, zonal_u, 'Zonal Mean Wind', np.linspace(-140,150,12), 'inferno')
+    zonal_plt_monthly(zonal_p, ls, zonal_u, 'Zonal Mean Wind', np.linspace(-150,150,16), 'inferno')
 
 def zonal_diff(filedir, var1, var2):
     '''     Use [::2] for visal's simulation
@@ -196,10 +190,10 @@ def zonal_diff(filedir, var1, var2):
     
     if var1 == '*_t_d.npy': 
         name = 'diff'
-        level = np.linspace(-16,20,12)
+        level = np.linspace(-12,24,13)
     else: 
         name = 'avg'
-        level = np.linspace(120,230,12)
+        level = np.linspace(110,240,14)
     print ('Looking at thermal tides')
     
     filepath = glob.glob(filedir + '*_press.npy')[0]
@@ -324,7 +318,6 @@ class hovmoller:
         
         psfc = martians_year(ls, psfc)
         ls = martians_year(ls, ls)
-        if self.rank == 1: print (np.where(ls==360)[0])
         
         sfc_storm = np.zeros((self.size*self.runs, ls.size))
         for i in np.arange(0, self.runs):
@@ -351,10 +344,10 @@ class hovmoller:
 #                sfc_storm = np.sqrt(np.abs(sfc_storm)*np.sign(sfc_storm))
                 
         if self.rank == 0:
-            sfc_storm = np.concatenate((sfc_storm[:,:5184], np.zeros((36, 29)), sfc_storm[:,5184:]), axis=1) 
-            sfc_storm = sfc_storm.reshape((36, 223, 24)).mean(axis = 2) # smoothing out array
-            sfc_storm_normed = sfc_storm/sfc_storm.max(axis=1)[:,np.newaxis]
-            np.save('sfc_storm', sfc_storm)
+#            sfc_storm = np.concatenate((sfc_storm[:,:5184], np.zeros((36, 29)), sfc_storm[:,5184:]), axis=1) 
+            sfc_storm_normed = sfc_storm#/sfc_storm[:].mean(axis=1)[:, np.newaxis]
+            sfc_storm_normed = sfc_storm_normed.reshape((36, 223, 12)).mean(axis = 2) # smoothing out array
+            print (sfc_storm_normed)
             
             lat = np.linspace(-90,90,36)
             ls = np.linspace(0,360,223)
@@ -363,12 +356,12 @@ class hovmoller:
 #            sfc_storm[np.where(sfc_storm>5)] = 0
             
             print ('Saving plot')
-            fig, ax = plt.subplots(figsize=(8,6))
+            fig, ax = plt.subplots(figsize=(8,5))
             im = ax.contourf(ls, lat, sfc_storm_normed, cmap='viridis')
             fig.colorbar(im)
             ax.set_ylabel('Latitude')
             ax.set_xlabel('Solar Longitude')
-            plt.savefig(pdFfigures, format='pdf', bbox_inches='tight')
+            plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=800)
 
 
 if call_function == 'misc':

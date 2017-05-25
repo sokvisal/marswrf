@@ -87,23 +87,29 @@ def init_reduction(filedir):
                 nc_file = i
                 data = Dataset(nc_file, mode='r')
                 
-                ls, temp, press, geoH, u, v = load_temp(nc_file, data)
+#                ls, temp, press, geoH, u, v = load_temp(nc_file, data)
+                psfc, ls_psfc = load_misc3D(nc_file, data, 'PSFC' )
             else:
                 nc_file = i
                 data = Dataset(nc_file, mode='r')
         		    
-                ls2, temp2, press2, geoH2, u2, v2 = load_temp(nc_file, data)
+#                ls2, temp2, press2, geoH2, u2, v2 = load_temp(nc_file, data)
+                psfc2, ls_psfc2 = load_misc3D(nc_file, data, 'PSFC')
         		    
-                ls = np.concatenate((ls, ls2),axis=0)
-                temp = np.concatenate((temp, temp2),axis=0)
-                press = np.concatenate((press, press2),axis=0)
-                geoH = np.concatenate((geoH, geoH2),axis=0)
-                u = np.concatenate((u, u2),axis=0)
-                v = np.concatenate((v, v2),axis=0)
+#                ls = np.concatenate((ls, ls2),axis=0)
+#                temp = np.concatenate((temp, temp2),axis=0)
+#                press = np.concatenate((press, press2),axis=0)
+#                geoH = np.concatenate((geoH, geoH2),axis=0)
+#                u = np.concatenate((u, u2),axis=0)
+#                v = np.concatenate((v, v2),axis=0)
+                
+                psfc = np.concatenate((psfc, psfc2),axis=0)
+                ls_psfc = np.concatenate((ls_psfc, ls_psfc2),axis=0)
         	    
         filedir2 = i.replace('wrfout','reduction/wrfout')
-        var_list = ['_ls','_temp','_press','_geoH', '_u', '_v']
-        for num, i in enumerate([ls,temp,press,geoH,u,v]):
+        var_list = ['_ls','_temp','_press','_geoH', '_u', '_v', '_psfc', '_ls_psfc']
+        var_list = ['_psfc', '_ls_psfc']
+        for num, i in enumerate([psfc, ls_psfc]):#[ls,temp,press,geoH,u,v, psfc, ls_psfc]):
             print('Saving', var_list[num])
             np.save(filedir2 + var_list[num], i)
     
@@ -154,6 +160,7 @@ def init_reduction(filedir):
                 data = Dataset(nc_file, mode='r')
 
                 psfc2, ls_psfc2 = load_misc3D(nc_file, data, 'PSFC')
+                print (psfc2.shape, ls_psfc2.shape)
                 psfc = np.concatenate((psfc, psfc2),axis=0)
                 ls_psfc = np.concatenate((ls_psfc, ls_psfc2),axis=0)
 
@@ -174,5 +181,5 @@ def init_reduction(filedir):
             print ('Tarring file,', i)            
             tar.add(i, arcname = i.replace(filedir, ''))
             tar.close()
-init_reduction('./../MarsWRF/diag.r14p1dustL45/')
+init_reduction('./../MarsWRF/diag.r14p1dustL40/data')
  
