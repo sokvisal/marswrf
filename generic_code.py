@@ -9,6 +9,7 @@ import matplotlib.colors as colors
 from matplotlib.backends.backend_pdf import PdfPages
 #import matplotlib.tri as tri
 import scipy.integrate as integrate
+import scipy.signal as signal
 import os
 import glob
 import sys
@@ -75,24 +76,36 @@ def spect_v(ls, data, tstep, lonstep, filt):
     
     padd = np.zeros((data.shape[0], data.shape[1]))
     padd[:data.shape[0], :data.shape[1]] = data
-    padd[:, 32:35] = 0
         
-    padFFT = np.fft.fftshift(np.fft.rfft2(padd))
+    padFFT = np.fft.fftshift(np.fft.fft2(padd, axes=[0]), axes=[0])
     c = np.fft.fftshift(np.fft.fftfreq(padFFT.shape[0], tstep))
     waven = np.fft.fftshift(np.fft.fftfreq(padFFT.shape[1], lonstep))*360
     
-    idx1 = np.where((abs(c)>.75)|(abs(c)<0.03))[0]
-    idx2 = np.where((abs(waven)<0.1))[0]
+    idx1 = np.where((abs(c)>0.75)|(abs(c)<0.03))[0]
+    idx2 = np.where((abs(c)<0.75)&(abs(c)>0.03))[0]
+    
 
 #     set everything that satisfy condition as zero, ie only filtering storm system
-    padFFT[idx1] = 0.000001  
+    padFFT[idx1] = 0
+#    size = int(idx2.size/2)
+#    hann = signal.hanning(size, True)
+#    print (idx2[239:241])
+#    hann = np.repeat(hann, 144).reshape((size, 144))
+#    
+#    padFFT[idx2][:size] = padFFT[idx2][:size]*hann
+#    padFFT[idx2][size:] = padFFT[idx2][size:]*hann
+          
+    if filt == 18:
+        plt.figure(figsize=(20,20))
+        plt.contourf(padFFT)
+        plt.colorbar()
+        plt.savefig('test.pdf', dpi=800)
 
-    filtered2 = np.fft.irfft2(np.fft.ifftshift(padFFT))
-    filtered2 = filtered2 #- filtered2.mean(axis=0)
+    filtered2 = np.fft.ifft2(np.fft.ifftshift(padFFT, axes=[0]), axes=[0])
     filtered = np.abs(filtered2[:data.shape[0], :data.shape[1]])**2
 
     temp = filtered.mean(axis=1)
-    return temp
+    return np.sqrt(temp)
 
 def zonal_plt_monthly(ydata, ls, data, title, level, cmap):
     fig, axes = plt.subplots(nrows=4, ncols=3, figsize=(14,20))
@@ -107,9 +120,9 @@ def zonal_plt_monthly(ydata, ls, data, title, level, cmap):
         
         d = data[i][4:]
         
-        im = ax.contourf(lat, y, d, levels=level, cmap=cmap, extend='both')
+        im = ax.contourf(lat, y, d, 12, cmap=cmap, extend='both')
         if not np.isnan(d).any():
-            ax.contour(lat, y, d, levels=level, linewidths=0.5, colors='k', extend='both')
+            ax.contour(lat, y, d, 12, linewidths=0.5, colors='k', extend='both')
         
         ax.set_title(r'{} LS {}-{}'.format((title), (i)*30, (i+1)*30))
         if i in [0,3,6,9]: ax.set_ylabel('Pressure (Pa)')
@@ -177,7 +190,8 @@ def zonal_avg(filedir, month, ls2):
 
 def zonal_diff(filedir, var1, var2):
     '''     Use [::2] for visal's simulation
-            Use [7::8] for chris's r14p1
+            Use [7::8] for chris' r14p1/dust/L40
+            Use [::8] for chris' r14p1dust/L45
     '''
     
     if var1 == '*_t_d.npy': 
@@ -287,7 +301,7 @@ def msf(filedir):
         msf[k] = temp
     
     norm = matplotlib.colors.Normalize(vmin=-1.,vmax=1.)
-    zonal_plt_monthly(p_field, ls, msf, 'Mean Meridional Streamfunction', np.logspace(-1.2e9, 4e9, 12), 'viridis')
+    zonal_plt_monthly(p_field, ls, msf, 'Mean Meridional Streamfunction', np.linspace(-1.2e9, 4e9, 12), 'viridis')
 
 class hovmoller:
     def __init__(self, directory):
@@ -308,15 +322,18 @@ class hovmoller:
         filepath = glob.glob(filedir + '*_ls_psfc.npy')[0]
         ls = np.load(filepath)  
         
-        ls = martians_year(ls, ls)
         psfc = martians_year(ls, psfc)
+        ls = martians_year(ls, ls)
+        if self.rank == 1: print (np.where(ls==360)[0])
         
-        sfc_storm = np.zeros((self.size*self.runs, ls.size), complex)
+        sfc_storm = np.zeros((self.size*self.runs, ls.size))
         for i in np.arange(0, self.runs):
             if self.rank == 0: print('Calculating latitudinal bins {}-{}'.format(i*self.size, (i+1)*self.size))
             surface_press = psfc[:, self.rank+(i*self.size), :]
-            
-            psfc_temp = surface_press - surface_press.mean(axis=0)
+            surface_press = signal.detrend(surface_press, axis=1, type='linear')
+            surface_press = signal.detrend(surface_press, axis=0, type='linear')
+#            psfc_temp = surface_press
+            psfc_temp = surface_press - surface_press.mean(axis=0)#.mean(axis=0)
             
 #            if self.rank+(self.size*i) == 18:
 #                plt.figure(1)
@@ -330,16 +347,17 @@ class hovmoller:
             
             main = np.array(self.comm.gather(temp, root=0))
             if self.rank == 0:
-                print (main.shape)
                 sfc_storm[i*self.size: (i+1)*self.size] = main
+#                sfc_storm = np.sqrt(np.abs(sfc_storm)*np.sign(sfc_storm))
                 
         if self.rank == 0:
-            sfc_storm = sfc_storm #- sfc_storm.mean(axis=0) # minus the mean in latitude for clarity
-            sfc_storm = sfc_storm.reshape((36, 223, 24)).mean(axis = 2) # smoothing out array
+            sfc_storm = sfc_storm
+#            sfc_storm = sfc_storm.reshape((36, 223, 12)).mean(axis = 2) # smoothing out array
+            sfc_storm_normed = sfc_storm/sfc_storm.max(axis=1)[:,np.newaxis]
             np.save('sfc_storm', sfc_storm)
             
             lat = np.linspace(-90,90,36)
-            ls = np.linspace(0,360,223)
+            ls = np.linspace(0,360,5323)
             ls, lat = np.meshgrid(ls, lat)
             
 #            sfc_storm[np.where(sfc_storm>5)] = 0
