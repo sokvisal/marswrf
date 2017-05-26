@@ -82,12 +82,19 @@ def spect_v(ls, data, tstep, lonstep, filt):
     waven = np.fft.fftshift(np.fft.fftfreq(padFFT.shape[1], lonstep))*360
     
     idx1 = np.where((abs(c)>0.75)|(abs(c)<0.03))[0]
-    wave1_idx = np.where(abs(waven)!=2)[0]
-    print (wave1_idx)
+#    wave1_idx = np.where((abs(waven)<1.5)|(abs(waven)>2.5))[0]
+    wave1_idx= np.where((abs(waven)!=3))[0]
     idx2 = np.where((abs(c)<0.75)&(abs(c)>0.03))[0]
     
 #     set everything that satisfy condition as zero, ie only filtering storm system
-    padFFT[idx1][:,wave1_idx] = 0
+    padFFT[idx1] = 0
+    padFFT[:,wave1_idx] = 0
+    
+    if filt == 18:
+        plt.figure(1)
+        plt.contourf(padFFT.real)
+        plt.colorbar()
+        plt.savefig('test.pdf')
 #    size = int(idx2.size/2)
 #    hann = signal.hanning(size, True)
 #    hann = np.repeat(hann, 72).reshape((size, 72))
@@ -333,7 +340,7 @@ class hovmoller:
             main = np.array(self.comm.gather(temp, root=0))
             if self.rank == 0:
                 sfc_storm[i*self.size: (i+1)*self.size] = main
-                sfc_storm = np.sqrt(np.abs(sfc_storm)*np.sign(sfc_storm))
+#                sfc_storm = np.sqrt(np.abs(sfc_storm)*np.sign(sfc_storm))
                 
         if self.rank == 0:
 #            sfc_storm = np.concatenate((sfc_storm[:,:5184], np.zeros((36, 29)), sfc_storm[:,5184:]), axis=1) 
