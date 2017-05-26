@@ -77,25 +77,25 @@ def spect_v(ls, data, tstep, lonstep, filt):
     padd = np.zeros((data.shape[0], data.shape[1]))
     padd[:data.shape[0], :data.shape[1]] = data
         
-    padFFT = np.fft.fftshift(np.fft.fft2(padd, axes=[0]), axes=[0])
+    padFFT = np.fft.fftshift(np.fft.fft2(padd))
     c = np.fft.fftshift(np.fft.fftfreq(padFFT.shape[0], tstep))
     waven = np.fft.fftshift(np.fft.fftfreq(padFFT.shape[1], lonstep))*360
     
     idx1 = np.where((abs(c)>0.75)|(abs(c)<0.03))[0]
-    wave1_idx = np.where(waven!=3)[0]
+    wave1_idx = np.where(abs(waven)!=2)[0]
+    print (wave1_idx)
     idx2 = np.where((abs(c)<0.75)&(abs(c)>0.03))[0]
     
 #     set everything that satisfy condition as zero, ie only filtering storm system
-    padFFT[idx1] = 0
-    size = int(idx2.size/2)
-    hann = signal.hanning(size, True)
-    print (idx2[239:241])
-    hann = np.repeat(hann, 72).reshape((size, 72))
-    
-    padFFT[idx2][:size] = padFFT[idx2][:size]*hann
-    padFFT[idx2][size:] = padFFT[idx2][size:]*hann
+    padFFT[idx1][:,wave1_idx] = 0
+#    size = int(idx2.size/2)
+#    hann = signal.hanning(size, True)
+#    hann = np.repeat(hann, 72).reshape((size, 72))
+#    
+#    padFFT[idx2][:size] = padFFT[idx2][:size]*hann
+#    padFFT[idx2][size:] = padFFT[idx2][size:]*hann
 
-    filtered2 = np.fft.ifft2(np.fft.ifftshift(padFFT, axes=[0]), axes=[0])
+    filtered2 = np.fft.ifft2(np.fft.ifftshift(padFFT))
     filtered = np.abs(filtered2[:data.shape[0], :data.shape[1]])**2
 
     temp = filtered.mean(axis=1)
@@ -197,7 +197,7 @@ def zonal_diff(filedir, var1, var2):
     print ('Looking at thermal tides')
     
     filepath = glob.glob(filedir + '*_press.npy')[0]
-    p = np.load(filepath)[7::8]
+    p = np.load(filepath)[::2]
 
     filepath = glob.glob(filedir + var1)[0]
     t_d = np.load(filepath)
@@ -207,16 +207,16 @@ def zonal_diff(filedir, var1, var2):
     print (t_d_2Pa.shape)
     
     filepath = glob.glob(filedir + '*_ls.npy')[0]
-    ls = np.load(filepath)[7::8]
+    ls = np.load(filepath)[::2]
     
     filepath = glob.glob(filedir + '*_ls_aux9.npy')
     if filepath:
         filepath = filepath[0]
         ls_aux9 = np.load(filepath)
     
-    idx = np.where(ls_aux9[0] == ls)[0]
-    ls = ls[idx[0]:]
-    p = p[idx[0]:]
+        idx = np.where(ls_aux9[0] == ls)[0]
+        ls = ls[idx[0]:]
+        p = p[idx[0]:]
 
     t_d = martians_year(ls, t_d)
     t_d_2Pa = martians_year(ls, t_d_2Pa)
@@ -323,30 +323,22 @@ class hovmoller:
         for i in np.arange(0, self.runs):
             if self.rank == 0: print('Calculating latitudinal bins {}-{}'.format(i*self.size, (i+1)*self.size))
             surface_press = psfc[:, self.rank+(i*self.size), :]
-            surface_press = signal.detrend(surface_press, axis=1, type='linear')
-            surface_press = signal.detrend(surface_press, axis=0, type='linear')
+            psfc_temp = surface_press - surface_press.mean(axis=0)
+            surface_press = signal.detrend(surface_press, axis=1, type='constant')
+            surface_press = signal.detrend(surface_press, axis=0, type='constant')
 #            psfc_temp = surface_press
-            psfc_temp = surface_press - surface_press.mean(axis=0)#.mean(axis=0)
-            
-#            if self.rank+(self.size*i) == 18:
-#                plt.figure(1)
-#                plt.contourf(surface_press)
-#                plt.savefig('sf.pdf')
-#                plt.figure(2)
-#                plt.contourf(psfc_temp)
-#                plt.savefig('p.pdf')
             
             temp = spect_v(ls, psfc_temp,  180., 5., self.rank+(self.size*i))
             
             main = np.array(self.comm.gather(temp, root=0))
             if self.rank == 0:
                 sfc_storm[i*self.size: (i+1)*self.size] = main
-#                sfc_storm = np.sqrt(np.abs(sfc_storm)*np.sign(sfc_storm))
+                sfc_storm = np.sqrt(np.abs(sfc_storm)*np.sign(sfc_storm))
                 
         if self.rank == 0:
 #            sfc_storm = np.concatenate((sfc_storm[:,:5184], np.zeros((36, 29)), sfc_storm[:,5184:]), axis=1) 
             sfc_storm_normed = sfc_storm#/sfc_storm[:].mean(axis=1)[:, np.newaxis]
-            sfc_storm_normed = sfc_storm_normed.reshape((36, 223, 12)).mean(axis = 2) # smoothing out array
+            sfc_storm_normed = sfc_storm_normed.reshape((36, 223, 24)).mean(axis = 2) # smoothing out array
             print (sfc_storm_normed)
             
             lat = np.linspace(-90,90,36)
