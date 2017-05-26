@@ -71,8 +71,10 @@ def redefine_latField(v):
             temp[i,j] = np.mean([v[i,j],v[i,j+1]])
     return temp
 
-def spect_v(ls, data, tstep, lonstep, filt):
+def spect_v(ls, data, tstep, lonstep, lowcut, highcut, wave):
     tstep = tstep/1440.
+    lowcut = 1/lowcut
+    highcut = 1/highcut
     
     padd = np.zeros((data.shape[0], data.shape[1]))
     padd[:data.shape[0], :data.shape[1]] = data
@@ -81,27 +83,25 @@ def spect_v(ls, data, tstep, lonstep, filt):
     c = np.fft.fftshift(np.fft.fftfreq(padFFT.shape[0], tstep))
     waven = np.fft.fftshift(np.fft.fftfreq(padFFT.shape[1], lonstep))*360
     
-    idx1 = np.where((abs(c)>0.75)|(abs(c)<0.03))[0]
+    idx1 = np.where((abs(c)>lowcut)|(abs(c)<highcut))[0]
 #    wave1_idx = np.where((abs(waven)<1.5)|(abs(waven)>2.5))[0]
-    wave1_idx= np.where((abs(waven)!=3))[0]
     idx2 = np.where((abs(c)<0.75)&(abs(c)>0.03))[0]
     
 #     set everything that satisfy condition as zero, ie only filtering storm system
     padFFT[idx1] = 0
-    padFFT[:,wave1_idx] = 0
+    if wave:
+        wave1_idx= np.where((abs(waven)!=3))[0]
+        padFFT[:,wave1_idx] = 0
+    else:
+        pass
     
-    if filt == 18:
-        plt.figure(1)
-        plt.contourf(padFFT.real)
-        plt.colorbar()
-        plt.savefig('test.pdf')
 #    size = int(idx2.size/2)
 #    hann = signal.hanning(size, True)
 #    hann = np.repeat(hann, 72).reshape((size, 72))
 #    
 #    padFFT[idx2][:size] = padFFT[idx2][:size]*hann
 #    padFFT[idx2][size:] = padFFT[idx2][size:]*hann
-
+    
     filtered2 = np.fft.ifft2(np.fft.ifftshift(padFFT))
     filtered = np.abs(filtered2[:data.shape[0], :data.shape[1]])**2
 
@@ -331,11 +331,14 @@ class hovmoller:
             if self.rank == 0: print('Calculating latitudinal bins {}-{}'.format(i*self.size, (i+1)*self.size))
             surface_press = psfc[:, self.rank+(i*self.size), :]
             psfc_temp = surface_press - surface_press.mean(axis=0)
-            surface_press = signal.detrend(surface_press, axis=1, type='constant')
-            surface_press = signal.detrend(surface_press, axis=0, type='constant')
+#            surface_press = signal.detrend(surface_press, axis=1, type='constant')
+#            surface_press = signal.detrend(surface_press, axis=0, type='constant')
 #            psfc_temp = surface_press
             
-            temp = spect_v(ls, psfc_temp,  180., 5., self.rank+(self.size*i))
+            wave = None
+            lowcut = 1.5 # period
+            highcut = 10. 
+            temp = spect_v(ls, psfc_temp,  180., 5., lowcut, highcut, wave)
             
             main = np.array(self.comm.gather(temp, root=0))
             if self.rank == 0:
@@ -344,9 +347,8 @@ class hovmoller:
                 
         if self.rank == 0:
 #            sfc_storm = np.concatenate((sfc_storm[:,:5184], np.zeros((36, 29)), sfc_storm[:,5184:]), axis=1) 
-            sfc_storm_normed = sfc_storm#/sfc_storm[:].mean(axis=1)[:, np.newaxis]
-            sfc_storm_normed = sfc_storm_normed.reshape((36, 223, 24)).mean(axis = 2) # smoothing out array
-            print (sfc_storm_normed)
+            sfc_storm_normed = sfc_storm#/sfc_storm[:].max(axis=1)[:, np.newaxis]
+            sfc_storm_normed = sfc_storm_normed.reshape((36, 223, 12)).mean(axis = 2) # smoothing out array
             
             lat = np.linspace(-90,90,36)
             ls = np.linspace(0,360,223)
@@ -355,11 +357,12 @@ class hovmoller:
 #            sfc_storm[np.where(sfc_storm>5)] = 0
             
             print ('Saving plot')
-            fig, ax = plt.subplots(figsize=(8,5))
+            fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10,6))
             im = ax.contourf(ls, lat, sfc_storm_normed, cmap='viridis')
-            fig.colorbar(im)
             ax.set_ylabel('Latitude')
             ax.set_xlabel('Solar Longitude')
+            ax.set_title('Bandpass Filter PSFC')
+            fig.colorbar(im, shrink=0.3, orientation='horizontal', pad=0.1)
             plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=800)
 
 
