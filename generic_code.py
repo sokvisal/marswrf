@@ -90,18 +90,11 @@ def spect_v(ls, data, tstep, lonstep, lowcut, highcut, wave):
 #     set everything that satisfy condition as zero, ie only filtering storm system
     padFFT[idx1] = 0
     if wave:
-        wave1_idx= np.where((abs(waven)!=3))[0]
+        wave1_idx= np.where((abs(waven)!=wave))[0]
         padFFT[:,wave1_idx] = 0
     else:
         pass
-    
-#    size = int(idx2.size/2)
-#    hann = signal.hanning(size, True)
-#    hann = np.repeat(hann, 72).reshape((size, 72))
-#    
-#    padFFT[idx2][:size] = padFFT[idx2][:size]*hann
-#    padFFT[idx2][size:] = padFFT[idx2][size:]*hann
-    
+
     filtered2 = np.fft.ifft2(np.fft.ifftshift(padFFT))
     filtered = np.abs(filtered2[:data.shape[0], :data.shape[1]])**2
 
@@ -121,9 +114,9 @@ def zonal_plt_monthly(ydata, ls, data, title, level, cmap):
         
         d = data[i][4:]
         
-        im = ax.contourf(lat, y, d, levels=level, cmap=cmap, extend='both')
+        im = ax.contourf(lat, y, d, 12, cmap=cmap, extend='both')
         if not np.isnan(d).any():
-            ax.contour(lat, y, d, levels=level, linewidths=0.5, colors='k', extend='both')
+            ax.contour(lat, y, d, 12, linewidths=0.5, colors='k', extend='both')
         
         ax.set_title(r'{} LS {}-{}'.format((title), (i)*30, (i+1)*30))
         if i in [0,3,6,9]: ax.set_ylabel('Pressure (Pa)')
@@ -153,8 +146,47 @@ def basemap_plt_monthly(data, ls, title, cmap):
         
     fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
     plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=800)
+    
+def plt_bandpass(directory):
+    print ('Looking at data ...')
+    data_low = sorted(glob.glob(directory+'*low.npy'))
+    temp_low = np.zeros((4,36,223))
+    for i, file in enumerate(data_low):
+        temp_low[i] = np.load(file)
+    
+    data_high = sorted(glob.glob(directory+'*high.npy'))
+    temp_high = np.zeros((4,36,223))
+    for i, file in enumerate(data_high):
+        temp_high[i] = np.load(file)
+        
+    lat = np.linspace(-90,90,36)
+    ls = np.linspace(0,360,223)
+    ls, lat = np.meshgrid(ls, lat)
+    
+    print ('Plotting ...')
+    level = np.linspace(5,25,6)
+    fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(14,18))
+    for i, ax in enumerate(axes.flat):
+        if i in [0,2,4,6]:
+            data = temp_low[int(i/2)]
+            im = ax.contourf(ls, lat, data, levels=level, cmap='viridis', extend='both')
+            for c in im.collections:
+                c.set_edgecolor("face")
+            name = data_low[int(i/2)].replace(directory, '').replace('sfc_filtered_', '').replace('.npy','')
+            ax.set_title(name)
+        else:
+            data = temp_high[int((i-1)/2)]
+            im = ax.contourf(ls, lat, data, levels=level, cmap='viridis', extend='both')
+            for c in im.collections:
+                c.set_edgecolor("face")
+            name = data_high[int((i-1)/2)].replace(directory, '').replace('sfc_filtered_', '').replace('.npy','')
+            ax.set_title(name)
+    
+    print ('Saving ...')
+    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, pad=0.03, orientation='horizontal')
+    plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=800)
 
-def zonal_avg(filedir, month, ls2):
+def zonal_avg(filedir):
     print ('Looking at zonal avg')
     ### ls1, ls2 - solar longitude 1, 2 ###
     
@@ -229,6 +261,7 @@ def zonal_diff(filedir, var1, var2):
     t_d_2Pa = martians_year(ls, t_d_2Pa)
     p = martians_year(ls, p)
     ls = martians_year(ls,ls)
+
     
 #    test_diff = t_d_2Pa.reshape((223,3,36,72)).mean(axis=1)
 #    ampl, phase, axis = fft.spec1d(t_d_2Pa, 1/72., use_axes = 2)
@@ -305,15 +338,28 @@ def msf(filedir):
     zonal_plt_monthly(p_field, ls, msf, 'Mean Meridional Streamfunction', np.linspace(-1.2e9, 4e9, 12), 'viridis')
 
 class hovmoller:
-    def __init__(self, directory):
+    def __init__(self, directory, bandpass):
         self.comm = MPI.COMM_WORLD
         self.rank = self.comm.Get_rank()
         self.size = self.comm.Get_size()
+        self.bandpass = bandpass
         
         assert 36%self.size == 0, "Number of processes requested ({}) is not divisible by latitudinal bins (36)".format(self.size)
         self.runs = int(36/self.size)
         
         self.__main__(directory)
+        
+    def __checkBandpass__(self, bandpass):
+        if bandpass == 'low':
+            lowcut = 1.5 # period
+            highcut = 5. 
+        if bandpass == 'high':
+            lowcut = 5 # period
+            highcut = 10. 
+        if bandpass == 'none':
+            lowcut = 1.5 # period
+            highcut = 10. 
+        return lowcut, highcut
         
     def __main__(self, filedir):
         
@@ -335,9 +381,8 @@ class hovmoller:
 #            surface_press = signal.detrend(surface_press, axis=0, type='constant')
 #            psfc_temp = surface_press
             
-            wave = None
-            lowcut = 1.5 # period
-            highcut = 10. 
+            wave = 2
+            lowcut, highcut = self.__checkBandpass__(bandpass)
             temp = spect_v(ls, psfc_temp,  180., 5., lowcut, highcut, wave)
             
             main = np.array(self.comm.gather(temp, root=0))
@@ -348,14 +393,15 @@ class hovmoller:
         if self.rank == 0:
 #            sfc_storm = np.concatenate((sfc_storm[:,:5184], np.zeros((36, 29)), sfc_storm[:,5184:]), axis=1) 
             sfc_storm_normed = sfc_storm#/sfc_storm[:].max(axis=1)[:, np.newaxis]
-            sfc_storm_normed = sfc_storm_normed.reshape((36, 223, 12)).mean(axis = 2) # smoothing out array
+            sfc_storm_normed = sfc_storm_normed.reshape((36, 223, 24)).mean(axis = 2) # smoothing out array
             
             lat = np.linspace(-90,90,36)
             ls = np.linspace(0,360,223)
             ls, lat = np.meshgrid(ls, lat)
+            filename = directory.replace('./test_data/reduction_','').replace('/','')
+            np.save('sfc_filtered_{}_{}.npy'.format(str(filename), str(self.bandpass)), sfc_storm_normed)
             
 #            sfc_storm[np.where(sfc_storm>5)] = 0
-            
             print ('Saving plot')
             fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10,6))
             im = ax.contourf(ls, lat, sfc_storm_normed, cmap='viridis')
@@ -365,18 +411,21 @@ class hovmoller:
             fig.colorbar(im, shrink=0.3, orientation='horizontal', pad=0.1)
             plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=800)
 
-
 if call_function == 'misc':
     with PdfPages(directory+'figures.pdf') as pdFfigures:
-        zonal_avg(directory,12,2)
+        zonal_avg(directory)
         zonal_diff(directory, '*_t_d.npy', '*_t_d_2Pa.npy')
         zonal_diff(directory, '*_t_a.npy', '*_t_a_2Pa.npy')
 if call_function == 'msf':
     with PdfPages(directory+'msf.pdf') as pdFfigures:   
         msf(directory)
+if call_function == 'bandpass':
+    with PdfPages(directory+'bandpass.pdf') as pdFfigures:
+        plt_bandpass(directory)
 if call_function == 'hovmoller':
+    bandpass = str(sys.argv[3])
     with PdfPages(directory+'hovmoller.pdf') as pdFfigures:
-        hovmoller(directory)
+        hovmoller(directory, bandpass)
 
 def net_hr_aer(filename, ls1, ls2):
     nc_file = filename
