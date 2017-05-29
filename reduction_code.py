@@ -27,15 +27,18 @@ def load_temp(filename, data):
     ph = data.variables['PH'][:] # perturbation geopot height
     phb = data.variables['PHB'][:] # base state geopot height
     
+    h = data.variables["HGT"][:]
+    
     u = data.variables['U'][:] # zonal wind
     v = data.variables['V'][:] # zonal meridional wind
     
     pot_temp = t + t0 # potential temperature
     press = p + pb # pressure
     geo_height = ph + phb
-    geo_height = geo_height.mean(axis = 3)
+#    geo_height = geo_height.mean(axis = 3)
     
     temp = pot_temp*(press/p0)**gamma # temperature
+    #alt = geo_height[:]/g - h[:]
     
     temp = temp.mean(axis = 3) # avg in long
     press = press.mean(axis = 3) # avg in long
@@ -69,6 +72,10 @@ def load_misc3D(filename, data, var_name):
     temp = data.variables[var_name][:]
     ls = data.variables['L_S'][:]
     return temp, ls
+
+def load_misc4D(filename, data, var_name):
+    temp = data.variables[var_name][:]
+    return temp
     
 def init_reduction(filedir):
     arg = sys.argv[1]
@@ -87,29 +94,60 @@ def init_reduction(filedir):
                 nc_file = i
                 data = Dataset(nc_file, mode='r')
                 
-#                ls, temp, press, geoH, u, v = load_temp(nc_file, data)
-                psfc, ls_psfc = load_misc3D(nc_file, data, 'PSFC' )
+                ls, temp, press, geoH, u, v = load_temp(nc_file, data)
+#                psfc, ls_psfc = load_misc3D(nc_file, data, 'PSFC' )
             else:
                 nc_file = i
                 data = Dataset(nc_file, mode='r')
         		    
-#                ls2, temp2, press2, geoH2, u2, v2 = load_temp(nc_file, data)
-                psfc2, ls_psfc2 = load_misc3D(nc_file, data, 'PSFC')
+                ls2, temp2, press2, geoH2, u2, v2 = load_temp(nc_file, data)
+#                psfc2, ls_psfc2 = load_misc3D(nc_file, data, 'PSFC')
         		    
-#                ls = np.concatenate((ls, ls2),axis=0)
-#                temp = np.concatenate((temp, temp2),axis=0)
-#                press = np.concatenate((press, press2),axis=0)
-#                geoH = np.concatenate((geoH, geoH2),axis=0)
-#                u = np.concatenate((u, u2),axis=0)
-#                v = np.concatenate((v, v2),axis=0)
+                ls = np.concatenate((ls, ls2),axis=0)
+                temp = np.concatenate((temp, temp2),axis=0)
+                press = np.concatenate((press, press2),axis=0)
+                geoH = np.concatenate((geoH, geoH2),axis=0)
+                u = np.concatenate((u, u2),axis=0)
+                v = np.concatenate((v, v2),axis=0)
                 
-                psfc = np.concatenate((psfc, psfc2),axis=0)
-                ls_psfc = np.concatenate((ls_psfc, ls_psfc2),axis=0)
+#                psfc = np.concatenate((psfc, psfc2),axis=0)
+#                ls_psfc = np.concatenate((ls_psfc, ls_psfc2),axis=0)
         	    
         filedir2 = i.replace('wrfout','reduction/wrfout')
-        var_list = ['_ls','_temp','_press','_geoH', '_u', '_v', '_psfc', '_ls_psfc']
-        var_list = ['_psfc', '_ls_psfc']
-        for num, i in enumerate([psfc, ls_psfc]):#[ls,temp,press,geoH,u,v, psfc, ls_psfc]):
+        var_list = ['_ls','_temp_2','_press','_geoH', '_u', '_v']
+#        var_list = ['_psfc', '_ls_psfc']
+        for num, i in enumerate([ls,temp,press,geoH,u,v]):#([psfc, ls_psfc]):
+            print('Saving', var_list[num])
+            np.save(filedir2 + var_list[num], i)
+            
+    def wrfout_ext():
+        filepath = filedir + '/wrfout_d01*'
+        print (filepath)
+        	    
+        for num, i in enumerate(sorted(glob.glob(filepath))):
+            print(i)
+            if num == 0:
+                nc_file = i
+                data = Dataset(nc_file, mode='r')
+                
+                t = load_misc4D(nc_file, data, 'T' )[:,16]
+#                psfc, ls_psfc = load_misc3D(nc_file, data, 'PSFC' )
+            else:
+                nc_file = i
+                data = Dataset(nc_file, mode='r')
+        		    
+                t2 = load_misc4D(nc_file, data, 'T')[:,16]
+#                psfc2, ls_psfc2 = load_misc3D(nc_file, data, 'PSFC')
+        		    
+                t = np.concatenate((t, t2),axis=0)
+                
+#                psfc = np.concatenate((psfc, psfc2),axis=0)
+#                ls_psfc = np.concatenate((ls_psfc, ls_psfc2),axis=0)
+        	    
+        filedir2 = i.replace('wrfout','reduction/wrfout')
+        var_list = ['_temp_2']
+#        var_list = ['_psfc', '_ls_psfc']
+        for num, i in enumerate([t]):#([psfc, ls_psfc]):
             print('Saving', var_list[num])
             np.save(filedir2 + var_list[num], i)
     
@@ -171,6 +209,7 @@ def init_reduction(filedir):
             np.save(filedir3 + var_list[num], i)
 
     if arg == 'wrfout': wrfout()
+    if arg == 'wrfout_ext': wrfout_ext()
     if arg == 'auxhist9': auxhist9()
     if arg == 'auxhist5': auxhist5()
     
@@ -181,5 +220,5 @@ def init_reduction(filedir):
             print ('Tarring file,', i)            
             tar.add(i, arcname = i.replace(filedir, ''))
             tar.close()
-init_reduction('./../MarsWRF/diag.r14p1dustL40/data')
+init_reduction('./../data_marswrf/diag.r14p1dustL40/data')
  

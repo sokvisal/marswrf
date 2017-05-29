@@ -371,7 +371,7 @@ class hovmoller:
         
     def __main__(self, filedir):
         
-        filepath = glob.glob(filedir + '*4_psfc.npy')[0]
+        filepath = glob.glob(filedir + '*4_temp_2.npy')[0]
         psfc = np.load(filepath)
         
         filepath = glob.glob(filedir + '*_ls_psfc.npy')[0]
@@ -389,7 +389,7 @@ class hovmoller:
 #            surface_press = signal.detrend(surface_press, axis=0, type='constant')
 #            psfc_temp = surface_press
             
-            wave = 2
+            wave = None
             lowcut, highcut = self.__checkBandpass__(bandpass)
             temp = spect_v(ls, psfc_temp,  180., 5., lowcut, highcut, wave)
             
@@ -401,7 +401,7 @@ class hovmoller:
         if self.rank == 0:
 #            sfc_storm = np.concatenate((sfc_storm[:,:5184], np.zeros((36, 29)), sfc_storm[:,5184:]), axis=1) 
             sfc_storm_normed = sfc_storm#/sfc_storm[:].max(axis=1)[:, np.newaxis]
-            sfc_storm_normed = sfc_storm_normed.reshape((36, 223, 12)).mean(axis = 2) # smoothing out array
+            sfc_storm_normed = sfc_storm_normed.reshape((36, 223, 24)).mean(axis = 2) # smoothing out array
             
             lat = np.linspace(-90,90,36)
             ls = np.linspace(0,360,223)
@@ -412,10 +412,10 @@ class hovmoller:
 #            sfc_storm[np.where(sfc_storm>5)] = 0
             print ('Saving plot')
             fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10,6))
-            im = ax.contourf(ls, lat, sfc_storm_normed, cmap='viridis')
+            im = ax.contourf(ls, lat, sfc_storm_normed, cmap='BuPu', levels = np.linspace(0,9,7), extend='both')
             ax.set_ylabel('Latitude')
             ax.set_xlabel('Solar Longitude')
-            ax.set_title('Bandpass Filter PSFC')
+            ax.set_title('Bandpass Filter Temp (2.5 km)')
             fig.colorbar(im, shrink=0.3, orientation='horizontal', pad=0.1)
             plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=800)
 
