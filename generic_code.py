@@ -102,7 +102,7 @@ def spect_v(ls, data, tstep, lonstep, lowcut, highcut, wave):
     return np.sqrt(temp)
 
 def zonal_plt_monthly(ydata, ls, data, title, level, cmap):
-    fig, axes = plt.subplots(nrows=4, ncols=3, figsize=(14,20))
+    fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(20,14))
     for i, ax in enumerate(axes.flat):
         y = ydata[i][4:]
         
@@ -119,14 +119,15 @@ def zonal_plt_monthly(ydata, ls, data, title, level, cmap):
             ax.contour(lat, y, d, 12, linewidths=0.5, colors='k', extend='both')
         
         ax.set_title(r'{} LS {}-{}'.format((title), (i)*30, (i+1)*30))
-        if i in [0,3,6,9]: ax.set_ylabel('Pressure (Pa)')
-        if i in [9,10,11]: ax.set_xlabel('Latitude ($^\circ$)')
+        if i in [0,4,8]: ax.set_ylabel('Pressure (Pa)')
+        if i in [8,9,10,11]: ax.set_xlabel('Latitude ($^\circ$)')
         ax.set_yscale('log')
         ax.set_ylim([900, 1e-2])
         
 #        print ('Saving 1st cool shit')
-    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
-    plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=800)
+    fig.tight_layout()
+    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.04)
+    plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=400)
 
 def basemap_plt_monthly(data, ls, title, cmap):
     fig, axes = plt.subplots(nrows=4, ncols=3, figsize=(14,20))
@@ -143,18 +144,19 @@ def basemap_plt_monthly(data, ls, title, cmap):
         if not np.isnan(d).any():
             ax.contour(lon, lat, d, linewidths=0.5, colors='black')
         ax.set_title(r'Avg {} LS {}-{} at 2 Pa'.format((title), (i)*30, (i+1)*30))
-        
+    
+    fig.tight_layout()
     fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
-    plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=800)
+    plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=400)
     
 def plt_bandpass(directory):
     print ('Looking at data ...')
-    data_low = sorted(glob.glob(directory+'*low.npy'))
+    data_low = sorted(glob.glob(directory+'*short.npy'))
     temp_low = np.zeros((4,36,223))
     for i, file in enumerate(data_low):
         temp_low[i] = np.load(file)
     
-    data_high = sorted(glob.glob(directory+'*high.npy'))
+    data_high = sorted(glob.glob(directory+'*long.npy'))
     temp_high = np.zeros((4,36,223))
     for i, file in enumerate(data_high):
         temp_high[i] = np.load(file)
@@ -165,26 +167,32 @@ def plt_bandpass(directory):
     
     print ('Plotting ...')
     level = np.linspace(5,25,6)
-    fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(14,18))
+    fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(12,16))
     for i, ax in enumerate(axes.flat):
         if i in [0,2,4,6]:
             data = temp_low[int(i/2)]
-            im = ax.contourf(ls, lat, data, levels=level, cmap='viridis', extend='both')
+            im = ax.contourf(ls, lat, data, levels=level, cmap='BuPu', extend='both')
             for c in im.collections:
                 c.set_edgecolor("face")
             name = data_low[int(i/2)].replace(directory, '').replace('sfc_filtered_', '').replace('.npy','')
+            ax.set_ylabel('Latitude ($^\circ$)')
+            if i in [6]:
+                ax.set_xlabel('Solar Longitude')
             ax.set_title(name)
         else:
             data = temp_high[int((i-1)/2)]
-            im = ax.contourf(ls, lat, data, levels=level, cmap='viridis', extend='both')
+            im = ax.contourf(ls, lat, data, levels=level, cmap='BuPu', extend='both')
             for c in im.collections:
                 c.set_edgecolor("face")
             name = data_high[int((i-1)/2)].replace(directory, '').replace('sfc_filtered_', '').replace('.npy','')
+            if i in [7]:
+                ax.set_xlabel('Solar Longitude')
             ax.set_title(name)
     
     print ('Saving ...')
+    fig.tight_layout()
     fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, pad=0.03, orientation='horizontal')
-    plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=800)
+    plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=400)
 
 def zonal_avg(filedir):
     print ('Looking at zonal avg')
@@ -350,10 +358,10 @@ class hovmoller:
         self.__main__(directory)
         
     def __checkBandpass__(self, bandpass):
-        if bandpass == 'low':
+        if bandpass == 'short':
             lowcut = 1.5 # period
             highcut = 5. 
-        if bandpass == 'high':
+        if bandpass == 'long':
             lowcut = 5 # period
             highcut = 10. 
         if bandpass == 'none':
