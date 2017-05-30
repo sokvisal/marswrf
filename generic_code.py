@@ -8,8 +8,6 @@ import matplotlib.pylab as plt
 import matplotlib.colors as colors
 from matplotlib.backends.backend_pdf import PdfPages
 #import matplotlib.tri as tri
-import scipy.integrate as integrate
-import scipy.signal as signal
 import os
 import glob
 import sys
@@ -71,6 +69,34 @@ def redefine_latField(v):
             temp[i,j] = np.mean([v[i,j],v[i,j+1]])
     return temp
 
+def butter_bandpass(lowcut, highcut, fs, order=5):
+    from scipy.signal import butter
+    
+    nyq = 0.5 * fs
+    low = lowcut / nyq
+    high = highcut / nyq
+    b, a = butter(order, [low, high], btype='band')
+    return b, a
+
+def butter_bandpass_filter(data, lowcut, highcut, fs, order=5,axis=0):
+    
+    from scipy.signal import lfilter
+    
+    b, a = butter_bandpass(lowcut, highcut, fs, order=order)
+    y = lfilter(b, a, data,axis=axis)
+    return y
+
+def window_stdev(arr, radius):
+    from scipy.ndimage.filters import uniform_filter1d
+
+    #array = arr, radius = half width of window in bins
+    #windows mean
+    c1 = uniform_filter1d(arr, 2*radius, mode='constant', origin=-radius,axis=0)
+    #windowed square mean
+    c2 = uniform_filter1d(arr*arr, 2*radius, mode='constant', origin=-radius,axis=0)
+    #std = windowed square mean - square(windowed mean)
+    return ((c2 - c1*c1)**.5)[:-2*radius+1]
+
 def spect_v(ls, data, tstep, lonstep, lowcut, highcut, wave):
     tstep = tstep/1440.
     lowcut = 1/lowcut
@@ -114,9 +140,9 @@ def zonal_plt_monthly(ydata, ls, data, title, level, cmap):
         
         d = data[i][4:]
         
-        im = ax.contourf(lat, y, d, 12, cmap=cmap, extend='both')
+        im = ax.contourf(lat, y, d, levels=level, cmap=cmap, extend='both')
         if not np.isnan(d).any():
-            ax.contour(lat, y, d, 12, linewidths=0.5, colors='k', extend='both')
+            ax.contour(lat, y, d, levels=level, linewidths=0.5, colors='k', extend='both')
         
         ax.set_title(r'{} LS {}-{}'.format((title), (i)*30, (i+1)*30))
         if i in [0,4,8]: ax.set_ylabel('Pressure (Pa)')
@@ -149,7 +175,7 @@ def basemap_plt_monthly(data, ls, title, cmap):
     fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.03)
     plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=400)
     
-def plt_bandpass(directory):
+def plt_decomp_bandpass(directory):
     print ('Looking at data ...')
     data_low = sorted(glob.glob(directory+'*short.npy'))
     temp_low = np.zeros((4,36,223))
@@ -198,19 +224,19 @@ def zonal_avg(filedir):
     print ('Looking at zonal avg')
     ### ls1, ls2 - solar longitude 1, 2 ###
     
-    filepath = glob.glob(filedir + '*_temp.npy')[0]
+    filepath = glob.glob(filedir + '*_T.npy')[0]
     print (filepath)
     temp = np.load(filepath)
     
-    filepath = glob.glob(filedir + '*_u.npy')[0]
+    filepath = glob.glob(filedir + '*_U.npy')[0]
     print (filepath)
     u = np.load(filepath)
     
-    filepath = glob.glob(filedir + '*_press.npy')[0]
+    filepath = glob.glob(filedir + '*_P.npy')[0]
     print (filepath)
     p = np.load(filepath)
         
-    filepath = glob.glob(filedir + '*_ls.npy')[0]
+    filepath = glob.glob(filedir + '*_LS.npy')[0]
     print (filepath)
     ls = np.load(filepath)
     
@@ -233,9 +259,10 @@ def zonal_diff(filedir, var1, var2):
     '''     Use [::2] for visal's simulation
             Use [7::8] for chris' r14p1/dust/L40
             Use [::8] for chris' r14p1dust/L45
+            Use [3::8] for r14p5
     '''
     
-    if var1 == '*_t_d.npy': 
+    if var1 == '*_TDIFF.npy': 
         name = 'diff'
         level = np.linspace(-12,24,13)
     else: 
@@ -243,24 +270,26 @@ def zonal_diff(filedir, var1, var2):
         level = np.linspace(110,240,14)
     print ('Looking at thermal tides')
     
-    filepath = glob.glob(filedir + '*_press.npy')[0]
-    p = np.load(filepath)[::2]
+    filepath = glob.glob(filedir + '*_P.npy')[0]
+    p = np.load(filepath)
 
     filepath = glob.glob(filedir + var1)[0]
     t_d = np.load(filepath)
     
     filepath = glob.glob(filedir + var2)[0]
     t_d_2Pa = np.load(filepath)
-    print (t_d_2Pa.shape)
     
-    filepath = glob.glob(filedir + '*_ls.npy')[0]
-    ls = np.load(filepath)[::2]
+    filepath = glob.glob(filedir + '*_LS.npy')[0]
+    ls = np.load(filepath)[3::8]
     
-    filepath = glob.glob(filedir + '*_ls_aux9.npy')
+    print (ls.shape, t_d.shape)
+    
+    filepath = glob.glob(filedir + '*_ls_AUX9.npy')
     if filepath:
         filepath = filepath[0]
         ls_aux9 = np.load(filepath)
-    
+        print(ls_aux9[-1])
+        
         idx = np.where(ls_aux9[0] == ls)[0]
         ls = ls[idx[0]:]
         p = p[idx[0]:]
@@ -287,17 +316,25 @@ def zonal_diff(filedir, var1, var2):
 #    print ('Plotting some cool shit')
 #    print ('Saving 1st cool shit')
 #    lat = np.linspace(-90, 90, 36) 
-#    ls = np.linspace(0,360, 669)
+#    ls = np.linspace(0,360, 223)
 #    t_lat, t_ls = np.meshgrid(lat, ls)
-#    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(8,8))
+#    
+#    fig, axes = plt.subplots(nrows=1, ncols=4, figsize=(20,4))
 #    for i, ax in enumerate(axes.flat):
-#        amplitude = test[i]
+#        amplitude = test[i].reshape((223,3,36)).mean(axis=1)
 #        phase = test2[i]
-#        im = ax.contourf(t_ls, t_lat, amplitude, cmap='viridis')
+#        
+#        im = ax.contourf(t_ls, t_lat, amplitude, extend='both', cmap='viridis')
 #        ax.set_title(r'm = {}'.format(i))
-#    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.06)
-#    plt.savefig(filedir+'wavenumber_timeseries_tdiff.pdf', bbox_inches='tight', dpi=1200)
+#        if i in [0]:
+#            ax.set_ylabel('Latitude ($^\circ$)')
+#        ax.set_xlabel('Solar Longitude')
+#    fig.tight_layout()
+#    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.15, orientation='horizontal', pad=0.15)
+#    plt.savefig(filedir+'wavenumber_timeseries_tdiff.pdf', bbox_inches='tight', dpi=400)
     
+    print (ls.shape, t_d.shape)
+
     zonal_t_d = martians_month(ls, t_d)
     zonal_t_2P = martians_month(ls, t_d_2Pa)
     zonal_p = martians_month(ls, p)
@@ -309,15 +346,18 @@ def zonal_diff(filedir, var1, var2):
 #    basemap_plt_monthly(zonal_t_2P, ls, 'T$_{\mathrm{'+name+'}}$', 'viridis')
     
 def msf(filedir):
+        
+    import scipy.integrate as integrate
+    
     print ('Looking at zonal mean meridional function')
     
-    filepath = glob.glob(filedir + '*_v.npy')[0]
+    filepath = glob.glob(filedir + '*_V.npy')[0]
     v = np.load(filepath)
     
-    filepath = glob.glob(filedir + '*_press.npy')[0]
+    filepath = glob.glob(filedir + '*_P.npy')[0]
     p = np.load(filepath)
     
-    filepath = glob.glob(filedir + '*_ls.npy')[0]
+    filepath = glob.glob(filedir + '*_LS.npy')[0]
     ls = np.load(filepath)
 
     p = martians_year(ls, p)
@@ -344,6 +384,40 @@ def msf(filedir):
     
     norm = matplotlib.colors.Normalize(vmin=-1.,vmax=1.)
     zonal_plt_monthly(p_field, ls, msf, 'Mean Meridional Streamfunction', np.linspace(-1.2e9, 4e9, 12), 'viridis')
+    
+def bandpass_filter(filedir):
+      
+    filepath = glob.glob(filedir + '*_T2KM.npy')[0]
+    psfc = np.load(filepath)
+    psfc = psfc - psfc.mean(axis=0)
+    
+    filepath = glob.glob(filedir + '*_ls_PSFC.npy')[0]
+    ls = np.load(filepath)  
+    
+    psfc = martians_year(ls, psfc)
+    ls = martians_year(ls, ls)
+    
+    fs = 8.
+    lowcut = 1./10
+    highcut = 1./1.5
+    
+    y = butter_bandpass_filter(psfc, lowcut, highcut, fs, order=3, axis=0)
+    wlen = 1+20/0.25
+    
+    dy = np.sqrt(window_stdev(y, int(wlen/2)))
+    dls = np.linspace(0, 360, dy.shape[0])
+    
+    lat = np.linspace(-90,90,36)
+    ls, lat = np.meshgrid(dls, lat)
+    
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10,6))
+    im = ax.contourf(ls, lat, dy.mean(axis=2).T, levels=np.linspace(0,6,9), cmap='BuPu', extend='both')
+    ax.set_ylabel('Latitude')
+    ax.set_xlabel('Solar Longitude')
+    ax.set_title('Bandpass Filter Temperature at 2.5 km')
+    fig.colorbar(im, shrink=0.4, orientation='horizontal', pad=0.1)
+    plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=400)
+    
 
 class hovmoller:
     def __init__(self, directory, bandpass):
@@ -412,7 +486,7 @@ class hovmoller:
 #            sfc_storm[np.where(sfc_storm>5)] = 0
             print ('Saving plot')
             fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10,6))
-            im = ax.contourf(ls, lat, sfc_storm_normed, cmap='BuPu', levels = np.linspace(0,9,7), extend='both')
+            im = ax.contourf(ls, lat, sfc_storm_normed, cmap='BuPu', extend='both')
             ax.set_ylabel('Latitude')
             ax.set_xlabel('Solar Longitude')
             ax.set_title('Bandpass Filter Temp (2.5 km)')
@@ -422,14 +496,17 @@ class hovmoller:
 if call_function == 'misc':
     with PdfPages(directory+'figures.pdf') as pdFfigures:
         zonal_avg(directory)
-        zonal_diff(directory, '*_t_d.npy', '*_t_d_2Pa.npy')
-        zonal_diff(directory, '*_t_a.npy', '*_t_a_2Pa.npy')
+        zonal_diff(directory, '*_TDIFF.npy', '*_TDIFF2PA.npy')
+        zonal_diff(directory, '*_TAVG.npy', '*_TDIFF2PA.npy')
 if call_function == 'msf':
     with PdfPages(directory+'msf.pdf') as pdFfigures:   
         msf(directory)
-if call_function == 'bandpass':
+if call_function == 'butterworth':
     with PdfPages(directory+'bandpass.pdf') as pdFfigures:
-        plt_bandpass(directory)
+        bandpass_filter(directory)
+if call_function == 'decomp_bandpass':
+    with PdfPages(directory+'decomp_bandpass.pdf') as pdFfigures:
+        plt_decomp_bandpass(directory)
 if call_function == 'hovmoller':
     bandpass = str(sys.argv[3])
     with PdfPages(directory+'hovmoller.pdf') as pdFfigures:

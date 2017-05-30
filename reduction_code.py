@@ -10,7 +10,7 @@ import gzip
 def name(**variable): 
     return [x for x in variable][0]
 
-def load_temp(filename, data):
+def load_zm(filename, data, varlist):
     t0 = 300. #data.variables['T00'][:] # base temperature
     p0 = 610. #data.variables['P00'][:] # base pressure
     r_d = 191.8366
@@ -18,34 +18,25 @@ def load_temp(filename, data):
     g = 3.727
     gamma = r_d/cp
     
-    t = data.variables['T'][:] # perturbation potential temp
-    
-    p = data.variables['P'][:] # perturbation pressure
-    pb = data.variables['PB'][:] # base state pressure
-    
     ls = data.variables['L_S'][:] # solar long
-    ph = data.variables['PH'][:] # perturbation geopot height
-    phb = data.variables['PHB'][:] # base state geopot height
     
-    h = data.variables["HGT"][:]
-    
-    u = data.variables['U'][:] # zonal wind
-    v = data.variables['V'][:] # zonal meridional wind
-    
-    pot_temp = t + t0 # potential temperature
-    press = p + pb # pressure
-    geo_height = ph + phb
-#    geo_height = geo_height.mean(axis = 3)
-    
-    temp = pot_temp*(press/p0)**gamma # temperature
-    #alt = geo_height[:]/g - h[:]
-    
-    temp = temp.mean(axis = 3) # avg in long
-    press = press.mean(axis = 3) # avg in long
-    u = u.mean(axis = 3) # avg in long
-    v = v.mean(axis = 3)
-    
-    return ls, temp, press, geo_height, u, v
+    tmp = []
+    for var in varlist:
+        if var == 'T':
+            t = data.variables['T'][:] # perturbation potential temp
+            
+            p = data.variables['P'][:] # perturbation pressure
+            pb = data.variables['PB'][:] # base state pressure
+            
+            pot_temp = t + t0 # potential temperature
+            p = p + pb # pressure
+            
+            tmp.append((pot_temp*(p/p0)**gamma).mean(axis = 3)) # temperature
+            tmp.append(p.mean(axis = 3))
+        else: 
+            tmp2 = data.variables[var][:]
+            tmp.append(tmp2.mean(axis = 3))
+    return ls, np.array(tmp)
 
 def load_misc(filename, data, var_name):
     var = var_name + '_PHY_AM'
@@ -64,7 +55,7 @@ def load_misc(filename, data, var_name):
 
     return t_a/2., t_d/2.,  t_a_2pa/2., t_d_2pa/2., ls
 
-def load_misc2D(filename, data, var_name):
+def load_misc_zm(filename, data, var_name):
     temp = data.variables[var_name][:].mean(axis=3)
     return temp
 
@@ -87,42 +78,39 @@ def init_reduction(filedir):
         if not os.path.exists(filedir+'/reduction'): 
             os.mkdir(filedir+'/reduction')
         	#    print filedir
-        	    
+        varlist = ['T', 'U']
         for num, i in enumerate(sorted(glob.glob(filepath))):
-            print(i)
+            print (i )
             if num == 0:
                 nc_file = i
                 data = Dataset(nc_file, mode='r')
                 
-                ls, temp, press, geoH, u, v = load_temp(nc_file, data)
-#                psfc, ls_psfc = load_misc3D(nc_file, data, 'PSFC' )
+                ls, tmp = load_zm(nc_file, data, varlist)
             else:
                 nc_file = i
                 data = Dataset(nc_file, mode='r')
         		    
-                ls2, temp2, press2, geoH2, u2, v2 = load_temp(nc_file, data)
-#                psfc2, ls_psfc2 = load_misc3D(nc_file, data, 'PSFC')
-        		    
-                ls = np.concatenate((ls, ls2),axis=0)
-                temp = np.concatenate((temp, temp2),axis=0)
-                press = np.concatenate((press, press2),axis=0)
-                geoH = np.concatenate((geoH, geoH2),axis=0)
-                u = np.concatenate((u, u2),axis=0)
-                v = np.concatenate((v, v2),axis=0)
+                ls2, tmp2 = load_zm(nc_file, data, varlist)
                 
-#                psfc = np.concatenate((psfc, psfc2),axis=0)
-#                ls_psfc = np.concatenate((ls_psfc, ls_psfc2),axis=0)
-        	    
-        filedir2 = i.replace('wrfout','reduction/wrfout')
-        var_list = ['_ls','_temp_2','_press','_geoH', '_u', '_v']
-#        var_list = ['_psfc', '_ls_psfc']
-        for num, i in enumerate([ls,temp,press,geoH,u,v]):#([psfc, ls_psfc]):
-            print('Saving', var_list[num])
-            np.save(filedir2 + var_list[num], i)
+                ls = np.concatenate((ls, ls2))
+                tmp = np.concatenate((tmp, tmp2),axis=1)
+        
+        filedir2 = i.replace(i,'{}/reduction/wrfout_{}'.format(filedir, 'ls'))
+        np.save(filedir2, ls)
+        del ls
+        
+        varlist.insert(1, 'P')
+        for j, var in enumerate(varlist):
+            filedir2 = i.replace(i,'{}/reduction/wrfout_ {}'.format(filedir, var))
+            print('Saving', var)
+            np.save(filedir2, tmp[j])
             
     def wrfout_ext():
         filepath = filedir + '/wrfout_d01*'
         print (filepath)
+        
+        if not os.path.exists(filedir+'/reduction'): 
+            os.mkdir(filedir+'/reduction')
         	    
         for num, i in enumerate(sorted(glob.glob(filepath))):
             print(i)
@@ -130,34 +118,35 @@ def init_reduction(filedir):
                 nc_file = i
                 data = Dataset(nc_file, mode='r')
                 
-                t = load_misc4D(nc_file, data, 'T' )[:,16]
-#                psfc, ls_psfc = load_misc3D(nc_file, data, 'PSFC' )
+                t = load_misc4D(nc_file, data, 'T' )[:,16] # t at 2 km
+                psfc, ls_psfc = load_misc3D(nc_file, data, 'PSFC' )
+                v = load_misc_zm(nc_file, data, 'V' )
             else:
                 nc_file = i
                 data = Dataset(nc_file, mode='r')
         		    
                 t2 = load_misc4D(nc_file, data, 'T')[:,16]
-#                psfc2, ls_psfc2 = load_misc3D(nc_file, data, 'PSFC')
+                psfc2, ls_psfc2 = load_misc3D(nc_file, data, 'PSFC')
+                v2 = load_misc_zm(nc_file, data, 'V' )
         		    
                 t = np.concatenate((t, t2),axis=0)
-                
-#                psfc = np.concatenate((psfc, psfc2),axis=0)
-#                ls_psfc = np.concatenate((ls_psfc, ls_psfc2),axis=0)
+                psfc = np.concatenate((psfc, psfc2),axis=0)
+                v = np.concatenate((v, v2),axis=0)
+                ls_psfc = np.concatenate((ls_psfc, ls_psfc2),axis=0)
         	    
-        filedir2 = i.replace('wrfout','reduction/wrfout')
-        var_list = ['_temp_2']
-#        var_list = ['_psfc', '_ls_psfc']
-        for num, i in enumerate([t]):#([psfc, ls_psfc]):
-            print('Saving', var_list[num])
-            np.save(filedir2 + var_list[num], i)
+        filedir2 = i.replace(i,'{}/reduction/wrfout'.format(filedir))
+        varlist = ['_T2KM', '_PSFC', '_ls_PSFC', '_V']
+        for num, i in enumerate([t, psfc, ls_psfc, v]):
+            print('Saving', varlist[num])
+            np.save(filedir2 + varlist[num], i)
     
     def auxhist9():
         print ('hi')  
         print ('cool')
-        filepath2 = filedir + '/auxhist9*'
-        print (filepath2)
+        filepath = filedir + '/auxhist9*'
+        print (filepath)
         
-        for num, i in enumerate(sorted(glob.glob(filepath2))):
+        for num, i in enumerate(sorted(glob.glob(filepath))):
             print (i)
             if num == 0:
                 nc_file = i
@@ -178,10 +167,10 @@ def init_reduction(filedir):
                 
                 ls = np.concatenate((ls, ls2), axis=0)
 	
-        filedir3 = i.replace('auxhist9','reduction/wrfout')        
-        var_list = ['_t_a', '_t_d', '_t_a_2Pa', '_t_d_2Pa', '_ls_aux9']
+        filedir2 = i.replace(i,'{}/reduction/wrfout'.format(filedir))        
+        var_list = ['_TAVG', '_TDIFF', '_TAVG2PA', '_TDIFF2PA', '_ls_AUX9']
         for num, i in enumerate([t_a, t_d, t_a_2Pa, t_d_2Pa, ls]):
-            np.save(filedir3 + var_list[num], i)
+            np.save(filedir2 + var_list[num], i)
  
     def auxhist5():    
         filepath2 = filedir+'/auxhist5*'
