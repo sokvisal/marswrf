@@ -118,25 +118,25 @@ def init_reduction(filedir):
                 nc_file = i
                 data = Dataset(nc_file, mode='r')
                 
-                t = load_misc4D(nc_file, data, 'T' )[:,16] # t at 2 km
-                psfc, ls_psfc = load_misc3D(nc_file, data, 'PSFC' )
-                v = load_misc_zm(nc_file, data, 'V' )
+                t = load_misc4D(nc_file, data, 'T' )[:,:,25:] # t at 2 km
+#                psfc, ls_psfc = load_misc3D(nc_file, data, 'PSFC' )
+#                v = load_misc_zm(nc_file, data, 'V' )
             else:
                 nc_file = i
                 data = Dataset(nc_file, mode='r')
         		    
-                t2 = load_misc4D(nc_file, data, 'T')[:,16]
-                psfc2, ls_psfc2 = load_misc3D(nc_file, data, 'PSFC')
-                v2 = load_misc_zm(nc_file, data, 'V' )
+                t2 = load_misc4D(nc_file, data, 'T')[:,:,25:]#[:,16]
+#                psfc2, ls_psfc2 = load_misc3D(nc_file, data, 'PSFC')
+#                v2 = load_misc_zm(nc_file, data, 'V' )
         		    
                 t = np.concatenate((t, t2),axis=0)
-                psfc = np.concatenate((psfc, psfc2),axis=0)
-                v = np.concatenate((v, v2),axis=0)
-                ls_psfc = np.concatenate((ls_psfc, ls_psfc2),axis=0)
+#                psfc = np.concatenate((psfc, psfc2),axis=0)
+#                v = np.concatenate((v, v2),axis=0)
+#                ls_psfc = np.concatenate((ls_psfc, ls_psfc2),axis=0)
         	    
         filedir2 = i.replace(i,'{}/reduction/wrfout'.format(filedir))
-        varlist = ['_T2KM', '_PSFC', '_ls_PSFC', '_V']
-        for num, i in enumerate([t, psfc, ls_psfc, v]):
+        varlist = ['_TPOT']#, '_PSFC', '_ls_PSFC', '_V']
+        for num, i in enumerate([t]):#, psfc, ls_psfc, v]):
             print('Saving', varlist[num])
             np.save(filedir2 + varlist[num], i)
     
@@ -209,5 +209,5 @@ def init_reduction(filedir):
             print ('Tarring file,', i)            
             tar.add(i, arcname = i.replace(filedir, ''))
             tar.close()
-init_reduction('./../data_marswrf/diag.r14p1dustL40/data')
+init_reduction('./../data_marswrf/diag.r14p5')
  

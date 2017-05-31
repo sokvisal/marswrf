@@ -404,14 +404,24 @@ def bandpass_filter(filedir):
     y = butter_bandpass_filter(psfc, lowcut, highcut, fs, order=3, axis=0)
     wlen = 1+20/0.25
     
+    decomp = False
     dy = np.sqrt(window_stdev(y, int(wlen/2)))
+    print(dy.shape)
+    if decomp:
+        dy = np.fft.fftshift(np.fft.fftn(dy, axes=[2]), axes=[2])
+        waven = np.fft.fftshift(np.fft.fftfreq(dy.shape[2], 5.))*360
+        idx = np.where(abs(waven) != 3)[0]
+        
+        dy[:,:,idx] = 0
+        dy = np.sqrt(np.abs(np.fft.ifftn(np.fft.ifftshift(dy, axes=[2]), axes=[2]))**2)
+        
     dls = np.linspace(0, 360, dy.shape[0])
     
     lat = np.linspace(-90,90,36)
     ls, lat = np.meshgrid(dls, lat)
     
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10,6))
-    im = ax.contourf(ls, lat, dy.mean(axis=2).T, levels=np.linspace(0,6,9), cmap='BuPu', extend='both')
+    im = ax.contourf(ls, lat, dy.mean(axis=2).T, cmap='BuPu', extend='both')
     ax.set_ylabel('Latitude')
     ax.set_xlabel('Solar Longitude')
     ax.set_title('Bandpass Filter Temperature at 2.5 km')
