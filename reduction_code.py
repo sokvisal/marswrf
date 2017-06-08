@@ -31,11 +31,11 @@ def load_zm(filename, data, varlist):
             pot_temp = t + t0 # potential temperature
             p = p + pb # pressure
             
-            tmp.append((pot_temp*(p/p0)**gamma).mean(axis = 3)) # temperature
-            tmp.append(p.mean(axis = 3))
+            tmp.append((pot_temp*(p/p0)**gamma)[:,:,25:,:]) # temperature
+            tmp.append(p[:,:,25:,:])
         else: 
             tmp2 = data.variables[var][:]
-            tmp.append(tmp2.mean(axis = 3))
+            tmp.append(tmp2.mean(axis=3))
     return ls, np.array(tmp)
 
 def load_misc(filename, data, var_name):
@@ -54,6 +54,18 @@ def load_misc(filename, data, var_name):
     t_a_2pa = t_pm[:,42,:,:] + t_am[:,42,:,:]
 
     return t_a/2., t_d/2.,  t_a_2pa/2., t_d_2pa/2., ls
+
+def load_TAU(filename, data, var_name):
+    var = var_name + '_AM'
+    t_am = data.variables[var][:] # solar long
+    
+    var2 = var_name + '_PM'
+    t_pm = data.variables[var2][:] # solar long
+
+    t_d = t_pm - t_am
+    t_a = t_pm + t_am 
+
+    return t_a/2., t_d/2.
 
 def load_misc_zm(filename, data, var_name):
     temp = data.variables[var_name][:].mean(axis=3)
@@ -78,7 +90,7 @@ def init_reduction(filedir):
         if not os.path.exists(filedir+'/reduction'): 
             os.mkdir(filedir+'/reduction')
         	#    print filedir
-        varlist = ['T', 'U']
+        varlist = ['T']
         for num, i in enumerate(sorted(glob.glob(filepath))):
             print (i )
             if num == 0:
@@ -95,7 +107,7 @@ def init_reduction(filedir):
                 ls = np.concatenate((ls, ls2))
                 tmp = np.concatenate((tmp, tmp2),axis=1)
         
-        filedir2 = i.replace(i,'{}/reduction/wrfout_{}'.format(filedir, 'ls'))
+        filedir2 = i.replace(i,'{}/reduction/wrfout_{}'.format(filedir, 'LS'))
         np.save(filedir2, ls)
         del ls
         
@@ -119,58 +131,61 @@ def init_reduction(filedir):
                 data = Dataset(nc_file, mode='r')
                 
                 t = load_misc4D(nc_file, data, 'T' )[:,:,25:] # t at 2 km
-#                psfc, ls_psfc = load_misc3D(nc_file, data, 'PSFC' )
-#                v = load_misc_zm(nc_file, data, 'V' )
+                psfc, ls_psfc = load_misc3D(nc_file, data, 'PSFC' )
+                v = load_misc_zm(nc_file, data, 'V' )
             else:
                 nc_file = i
                 data = Dataset(nc_file, mode='r')
         		    
                 t2 = load_misc4D(nc_file, data, 'T')[:,:,25:]#[:,16]
-#                psfc2, ls_psfc2 = load_misc3D(nc_file, data, 'PSFC')
-#                v2 = load_misc_zm(nc_file, data, 'V' )
+                psfc2, ls_psfc2 = load_misc3D(nc_file, data, 'PSFC')
+                v2 = load_misc_zm(nc_file, data, 'V' )
         		    
                 t = np.concatenate((t, t2),axis=0)
-#                psfc = np.concatenate((psfc, psfc2),axis=0)
-#                v = np.concatenate((v, v2),axis=0)
-#                ls_psfc = np.concatenate((ls_psfc, ls_psfc2),axis=0)
+                psfc = np.concatenate((psfc, psfc2),axis=0)
+                v = np.concatenate((v, v2),axis=0)
+                ls_psfc = np.concatenate((ls_psfc, ls_psfc2),axis=0)
         	    
         filedir2 = i.replace(i,'{}/reduction/wrfout'.format(filedir))
-        varlist = ['_TPOT']#, '_PSFC', '_ls_PSFC', '_V']
+        varlist = ['_POT']#, '_PSFC', '_ls_PSFC', '_V']
         for num, i in enumerate([t]):#, psfc, ls_psfc, v]):
             print('Saving', varlist[num])
             np.save(filedir2 + varlist[num], i)
     
     def auxhist9():
-        print ('hi')  
-        print ('cool')
         filepath = filedir + '/auxhist9*'
         print (filepath)
         
-        for num, i in enumerate(sorted(glob.glob(filepath))):
-            print (i)
-            if num == 0:
-                nc_file = i
-                data = Dataset(nc_file, mode='r')
-		
-                t_a, t_d, t_a_2Pa, t_d_2Pa, ls = load_misc(nc_file, data, 'T' )
-            else: 
-                nc_file = i
-                data = Dataset(nc_file, mode='r')
-		
-                t_a2, t_d2, t_a2_2Pa, t_d2_2Pa, ls2 = load_misc(nc_file, data, 'T')
-                
-                t_a = np.concatenate((t_a, t_a2),axis=0)
-                t_d = np.concatenate((t_d, t_d2),axis=0)
-                
-                t_a_2Pa = np.concatenate((t_a_2Pa, t_a2_2Pa),axis=0)
-                t_d_2Pa = np.concatenate((t_d_2Pa, t_d2_2Pa),axis=0)
-                
-                ls = np.concatenate((ls, ls2), axis=0)
+        if not os.path.exists(filedir+'/reduction'): 
+            os.mkdir(filedir+'/reduction')
+        
+        varlist = ['T_PHY']
+        for var in varlist:
+            #print (sorted(glob.glob(filepath)))
+            for num, i in enumerate(tqdm(sorted(glob.glob(filepath)))):
+                if num == 0:
+                    nc_file = i
+                    data = Dataset(nc_file, mode='r')
+        		
+                    avg, diff, avg2Pa, diff2Pa, ls = load_misc(nc_file, data, var)
+                else: 
+                    nc_file = i
+                    data = Dataset(nc_file, mode='r')
+        		
+                    avg2, diff2, avg2Pa2, diff2Pa2, ls2 = load_misc(nc_file, data, var)
+                    
+                    avg = np.concatenate((avg, avg2),axis=0)
+                    diff = np.concatenate((diff, diff2),axis=0)
+                    
+                    avg2Pa = np.concatenate((avg2Pa, avg2Pa2),axis=0)
+                    diff2Pa = np.concatenate((diff2Pa, diff2Pa2),axis=0)
+                    
+                    ls = np.concatenate((ls, ls2), axis=0)
 	
-        filedir2 = i.replace(i,'{}/reduction/wrfout'.format(filedir))        
-        var_list = ['_TAVG', '_TDIFF', '_TAVG2PA', '_TDIFF2PA', '_ls_AUX9']
-        for num, i in enumerate([t_a, t_d, t_a_2Pa, t_d_2Pa, ls]):
-            np.save(filedir2 + var_list[num], i)
+            filedir2 = i.replace(i,'{}/reduction/wrfout_'.format(filedir))        
+            varlist2 = ['_AVG', '_DIFF', '_AVG2PA', '_DIFF2PA', '_ls_AUX9']
+            for num, i in enumerate([avg, diff, avg2Pa, diff2Pa, ls]):
+                np.save(filedir2 + var + varlist2[num], i)
  
     def auxhist5():    
         filepath2 = filedir+'/auxhist5*'
@@ -196,11 +211,48 @@ def init_reduction(filedir):
         for num, i in enumerate([psfc,ls_psfc]):
             print(psfc.shape)
             np.save(filedir3 + var_list[num], i)
+            
+    def tmsf():
+        filepath = filedir+'/wrfout*'
+        
+        for num, i in enumerate(sorted(glob.glob(filepath))):
+            print (i)
+            if num == 0:
+                nc_file = i
+                data = Dataset(nc_file, mode='r')
+
+#                t = load_misc4D(nc_file, data, 'T' )
+                v = load_misc4D(nc_file, data, 'V' )
+            else:
+                nc_file = i
+                data = Dataset(nc_file, mode='r')
+                
+#                t2 = load_misc4D(nc_file, data, 'T' )
+                v2 = load_misc4D(nc_file, data, 'V' )
+                
+#                t = np.concatenate((t, t2),axis=0)
+                v = np.concatenate((v, v2),axis=0)
+
+#        v = 1/2.*(v[:,1:]+v[:,:-1])
+#        vAno = v - v.mean()
+#        tAno = t - t.mean()
+#        tmp = vAno*tAno
+#        del vAno, tAno
+#        tmp = tmp.mean(axis=0).mean(axis=2)
+        
+#        tAvg = t.mean(axis=0).mean(axis=2)
+        
+        filedir3 = i.replace(i,'{}/reduction/wrfout'.format(filedir))
+        var_list = ['_VFULL']
+        for num, i in enumerate([v]):
+            np.save(filedir3 + var_list[num], i)
+        
 
     if arg == 'wrfout': wrfout()
     if arg == 'wrfout_ext': wrfout_ext()
     if arg == 'auxhist9': auxhist9()
     if arg == 'auxhist5': auxhist5()
+    if arg == 'tmsf': tmsf()
     
     print (tar_cond)
     if tar_cond == 1:
@@ -209,5 +261,5 @@ def init_reduction(filedir):
             print ('Tarring file,', i)            
             tar.add(i, arcname = i.replace(filedir, ''))
             tar.close()
-init_reduction('./../data_marswrf/diag.r14p5')
+init_reduction('./../data_marswrf/diag.r14p5/')
  
