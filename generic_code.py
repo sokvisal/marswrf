@@ -155,8 +155,7 @@ def zonal_plt_monthly(ydata, ls, data, title, level, norm, cmap):
         lat, temp_press = np.meshgrid(lat, temp_press)
         
         d = data[i][6:]
-        
-<<<<<<< HEAD
+
         if norm:
             im = ax.contourf(lat, y, d, levels=level, cmap=cmap, norm=SymLogNorm(linthresh=1e5,vmin=np.min(d), vmax=np.max(d)))
             if not np.isnan(d).any():
@@ -167,15 +166,10 @@ def zonal_plt_monthly(ydata, ls, data, title, level, norm, cmap):
             im = ax.contourf(lat, y, d, levels=level, cmap=cmap, extend='both')
             if not np.isnan(d).any():
                 ax.contour(lat, y, d, levels=level, linewidths=0.5, colors='k', extend='both')
-=======
-        im = ax.contourf(lat, y, d, 12, cmap=cmap, extend='both')
-        if not np.isnan(d).any():
-            ax.contour(lat, y, d, 12, linewidths=0.5, colors='k', extend='both')
->>>>>>> 4f814091e85a7cba85d9124e0661a75364f44ef6
         
         ax.set_title(r'{} LS {}-{}'.format((title), (i)*30, (i+1)*30))
-        if i in [0,4,8]: ax.set_ylabel('Pressure (Pa)')
-        if i in [8,9,10,11]: ax.set_xlabel('Latitude ($^\circ$)')
+        if i in [0,4,8]: ax.set_ylabel('Pressure [Pa]')
+        if i in [8,9,10,11]: ax.set_xlabel('Latitude [$^\circ$]')
         ax.set_yscale('log')
         ax.set_ylim([900, 1e-2])
         
@@ -293,17 +287,14 @@ def fft_tides(filedir, var1, var2):
     
     if var1 == '*_TDIFF.npy': 
         name = 'diff'
-        level = np.linspace(-12,14,14)
+        level = np.linspace(-8,16,9)
     else: 
         name = 'avg'
-        level = np.linspace(110,240,14)
+        level = np.linspace(100,190,10)
     print ('Looking at thermal tides')
     
     filepath = glob.glob(filedir + '*_P.npy')[0]
     p = np.load(filepath)
-
-    filepath = glob.glob(filedir + var1)[0]
-    t_d = np.load(filepath)
     
     filepath = glob.glob(filedir + var2)[0]
     t_d_2Pa = np.load(filepath)
@@ -321,48 +312,45 @@ def fft_tides(filedir, var1, var2):
         ls = ls[idx[0]:]
         p = p[idx[0]:]
 
-    t_d = martians_year(ls, t_d)
     t_d_2Pa = martians_year(ls, t_d_2Pa)
     p = martians_year(ls, p)
     ls = martians_year(ls,ls)
 #
     ampl = np.fft.fftshift(np.fft.fft2(t_d_2Pa, axes=[2]), axes=[2])
-    tmp = ampl[:,:,:int(ampl.shape[2]/2)]
-    tmp2 = ampl[:,:,int(ampl.shape[2]/2):]
-    tmp3 = tmp[::-1]+tmp2
-    print (tmp.shape,tmp2.shape)
-    ampl = np.abs(ampl)*np.sign(np.angle(ampl))/2.
-    ampl = ampl[:,:,int(ampl.shape[2]/2):]
+    tmp = np.fft.fftshift(np.fft.fftfreq(72, 5))*360
+                         
+    waven = [0,1,2]
+    ampList = np.zeros((3,669,36), complex)
+    for i in waven:
+        idx = np.where(abs(tmp)!=i)[0]
+        ampl[:,:,idx] = 0
+        ampl = np.fft.ifft2(np.fft.ifftshift(ampl, axes=[2]), axes=[2])
+        ampList[i] = ampl.mean(axis=2)
+
+#    print (ampList[1])
     
-    #tmp2 = tmp+np.sign(np.angle(ampl[:,:,int(ampl.shape[2]/2):]))
-#    print (ampl.shape)
-#    
-#    ampl, phase, axis = fft.spec1d(t_d_2Pa, 1/72., use_axes = 2)
-    
-    test = np.zeros((3,669,36)) # amplitude
-    for j in np.arange(0,3):
-        for i in np.arange(0,669):
-            test[j,i] = tmp3[i,:,j]
-            
+
+#    plt.contourf(ampl[1].T)
+#    plt.colorbar()
+#    plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=400) #filedir+'wavenumber_timeseries_{}.pdf'.format('t'+name)
+
     lat = np.linspace(-90, 90, 36) 
     ls = np.linspace(0,360, 223)
     tmplat, tmpls = np.meshgrid(lat, ls)
 
-    print (test.shape)
-    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(15,5))
-    for i, ax in enumerate(axes.flat):
-        amplitude = test[i].reshape((223,3,36)).mean(axis=1)
-        
-        im = ax.contourf(tmpls, tmplat, amplitude, extend='both', cmap='viridis')
-        ax.set_title(r'{} [m={}]'.format('T$_{\mathrm{'+name+'}}$',i))
-        if i in [0]:
-            ax.set_ylabel('Latitude [$^\circ$]')
-        ax.set_xlabel('Solar Longitude')
-        
-        ax.xaxis.set_minor_locator(AutoMinorLocator(6))
-        ax.yaxis.set_minor_locator(AutoMinorLocator(5))
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(8,6))
+    amplitude = ampList[0].reshape((223,3,36)).mean(axis=1)
+    
+    im = ax.contourf(tmpls, tmplat, amplitude, levels=level, extend='both', cmap='viridis')
+    ax.set_title(r'{} [m={}]'.format('T$_{\mathrm{'+name+'}}$',i))
+    if i in [0]:
+        ax.set_ylabel('Latitude [$^\circ$]')
+    ax.set_xlabel('Solar Longitude')
+    
+    ax.xaxis.set_minor_locator(AutoMinorLocator(6))
+    ax.yaxis.set_minor_locator(AutoMinorLocator(5))
     fig.tight_layout()
-    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.15)
+    fig.colorbar(im, shrink=0.45, orientation='horizontal', pad=0.12)
     plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=400) #filedir+'wavenumber_timeseries_{}.pdf'.format('t'+name)
 
 def zonal_diff(filedir, var1, var2):
@@ -372,9 +360,9 @@ def zonal_diff(filedir, var1, var2):
             Use [3::8] for r14p5
     '''
     
-    if var1 == '*_TDIFF.npy': 
+    if var1 == '*_PHY_DIFF.npy': 
         name = 'diff'
-        level = np.linspace(-12,14,14)
+        level = np.linspace(-10,14,13)
     else: 
         name = 'avg'
         level = np.linspace(110,240,14)
@@ -410,12 +398,21 @@ def zonal_diff(filedir, var1, var2):
     ls = martians_year(ls,ls)
     
     print (ls.shape, t_d.shape)
-
-    zonal_t_d = martians_month(ls, t_d)
-    zonal_t_2P = martians_month(ls, t_d_2Pa)
+#
+#    zonal_t_d = martians_month(ls, t_d)
+#    zonal_t_2P = martians_month(ls, t_d_2Pa)
     zonal_p = martians_month(ls, p)
+    print (t_d.shape)
     
+    ampl = np.fft.fftshift(np.fft.fft2(t_d, axes=[3]), axes=[3])
+    tmp = np.fft.fftshift(np.fft.fftfreq(72, 5))*360
+    idx = np.where(abs(tmp)!=0)[0]
+    ampl[:,:,:,idx] = 0
+    ampl = np.fft.ifft2(np.fft.ifftshift(ampl, axes=[3]), axes=[3])
     print ('Saving 2nd shit')
+    
+    zonal_t_d = martians_month(ls, ampl.mean(axis=3))
+    print (level)
     zonal_plt_monthly(zonal_p, ls, zonal_t_d, 'T$_{\mathrm{'+name+'}}$', level, False, 'viridis')
         
 #    print ('Saving 3rd cool shit')
@@ -450,41 +447,31 @@ def msf(filedir):
 #        p_field[k] = zonal_p
 #        zonal_v = redefine_latField(zonal_v)
     zonal_v = 0.5*(v[:,:,1:]+v[:,:,:-1])
-<<<<<<< HEAD
-=======
+
     print (zonal_v.shape, p.shape)
->>>>>>> 4f814091e85a7cba85d9124e0661a75364f44ef6
-        
     lat = np.linspace(-90,90,36)
     a = 3389920.
     g = 3.727
     tmp = np.zeros_like(zonal_v)
-<<<<<<< HEAD
     for i in tqdm(np.arange(tmp.shape[0])):
-=======
-    print (tmp.shape)
-    for i in np.arange(tmp.shape[0]):
         print (i)
->>>>>>> 4f814091e85a7cba85d9124e0661a75364f44ef6
         for j in np.arange(tmp.shape[2]):
             tmp[i,::-1,j] = 2*np.pi*(a/g)*np.cos(np.deg2rad(lat[j]))*integrate.cumtrapz(zonal_v[i,::-1,j], p[i,::-1,j], initial=0)
     
     msf = martians_month(ls, tmp)
     p_field = martians_month(ls, p)
-<<<<<<< HEAD
-    
+
     slev = np.logspace(5,11,10)
     slev = np.hstack([-1*slev[::-1],slev])
     
     norm = True
 #    norm = matplotlib.colors.Normalize(vmin=-1.,vmax=1.)
     zonal_plt_monthly(p_field, ls, msf, 'Mean Meridional Streamfunction', slev, norm, 'viridis')
-=======
+
     print (tmp.shape)
 #    norm = matplotlib.colors.Normalize(vmin=-1.,vmax=1.)
     zonal_plt_monthly(p_field, ls, msf, 'Mean Meridional Streamfunction', np.linspace(-1.2e9, 4e9, 12), 'viridis')
->>>>>>> 4f814091e85a7cba85d9124e0661a75364f44ef6
-    
+
 def bandpass_filter(filedir):
       
     filepath = glob.glob(filedir + '*_T2KM.npy')[0]
@@ -605,9 +592,9 @@ class hovmoller:
 
 if call_function == 'misc':
     with PdfPages(directory+'figures.pdf') as pdFfigures:
-        zonal_avg(directory)
-        zonal_diff(directory, '*_TDIFF.npy', '*_TDIFF2PA.npy')
-        zonal_diff(directory, '*_TAVG.npy', '*_TAVG2PA.npy')
+#        zonal_avg(directory)
+        zonal_diff(directory, '*_PHY_DIFF.npy', '*_PHY_DIFF2PA.npy')
+#        zonal_diff(directory, '*_TAVG.npy', '*_TAVG2PA.npy')
 if call_function == 'msf':
     with PdfPages(directory+'msf.pdf') as pdFfigures:   
         msf(directory)
@@ -623,8 +610,8 @@ if call_function == 'hovmoller':
         hovmoller(directory, bandpass)
 if call_function == 'tides':
     with PdfPages(directory+'fftTides.pdf') as pdFfigures:
-        fft_tides(directory, '*_TDIFF.npy', '*_TDIFF2PA.npy')
-        fft_tides(directory, '*_TAVG.npy', '*_TAVG2PA.npy')
+        fft_tides(directory, '*_TDIFF.npy', '*_PHY_DIFF2PA.npy')
+        fft_tides(directory, '*_TAVG.npy', '*_PHY_AVG2PA.npy')
 
 def net_hr_aer(filename, ls1, ls2):
     nc_file = filename
