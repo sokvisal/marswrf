@@ -48,11 +48,10 @@ def load_misc(filename, data, var_name):
     
     ls = data.variables['L_S'][:]
 
-    t_d = t_pm.mean(axis=3) - t_am.mean(axis=3)
-    t_a = t_pm.mean(axis=3) + t_am.mean(axis=3) 
-    
-    t_d_2pa = t_pm[:,42,:,:] - t_am[:,42,:,:]
-    t_a_2pa = t_pm[:,42,:,:] + t_am[:,42,:,:]
+    t_d = t_pm - t_am
+    t_a = t_pm + t_am 
+    t_d_2pa = t_pm[:,42] - t_am[:,42]
+    t_a_2pa = t_pm[:,42] + t_am[:,42]
 
     return t_a/2., t_d/2.,  t_a_2pa/2., t_d_2pa/2., ls
 
@@ -248,5 +247,5 @@ def init_reduction(filedir):
             print ('Tarring file,', i)            
             tar.add(i, arcname = i.replace(filedir, ''))
             tar.close()
-init_reduction('./../')
+init_reduction('./../data_marswrf/diag.r14p1dustL45/')
  
