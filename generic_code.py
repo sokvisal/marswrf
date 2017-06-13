@@ -156,6 +156,7 @@ def zonal_plt_monthly(ydata, ls, data, title, level, norm, cmap):
         
         d = data[i][6:]
         
+<<<<<<< HEAD
         if norm:
             im = ax.contourf(lat, y, d, levels=level, cmap=cmap, norm=SymLogNorm(linthresh=1e5,vmin=np.min(d), vmax=np.max(d)))
             if not np.isnan(d).any():
@@ -166,6 +167,11 @@ def zonal_plt_monthly(ydata, ls, data, title, level, norm, cmap):
             im = ax.contourf(lat, y, d, levels=level, cmap=cmap, extend='both')
             if not np.isnan(d).any():
                 ax.contour(lat, y, d, levels=level, linewidths=0.5, colors='k', extend='both')
+=======
+        im = ax.contourf(lat, y, d, 12, cmap=cmap, extend='both')
+        if not np.isnan(d).any():
+            ax.contour(lat, y, d, 12, linewidths=0.5, colors='k', extend='both')
+>>>>>>> 4f814091e85a7cba85d9124e0661a75364f44ef6
         
         ax.set_title(r'{} LS {}-{}'.format((title), (i)*30, (i+1)*30))
         if i in [0,4,8]: ax.set_ylabel('Pressure (Pa)')
@@ -426,6 +432,7 @@ def msf(filedir):
     
     filepath = glob.glob(filedir + '*_P.npy')[0]
     p = np.load(filepath)
+    print (v.shape, p.shape)
     
     filepath = glob.glob(filedir + '*_LS.npy')[0]
     ls = np.load(filepath)
@@ -443,17 +450,28 @@ def msf(filedir):
 #        p_field[k] = zonal_p
 #        zonal_v = redefine_latField(zonal_v)
     zonal_v = 0.5*(v[:,:,1:]+v[:,:,:-1])
+<<<<<<< HEAD
+=======
+    print (zonal_v.shape, p.shape)
+>>>>>>> 4f814091e85a7cba85d9124e0661a75364f44ef6
         
     lat = np.linspace(-90,90,36)
     a = 3389920.
     g = 3.727
     tmp = np.zeros_like(zonal_v)
+<<<<<<< HEAD
     for i in tqdm(np.arange(tmp.shape[0])):
+=======
+    print (tmp.shape)
+    for i in np.arange(tmp.shape[0]):
+        print (i)
+>>>>>>> 4f814091e85a7cba85d9124e0661a75364f44ef6
         for j in np.arange(tmp.shape[2]):
             tmp[i,::-1,j] = 2*np.pi*(a/g)*np.cos(np.deg2rad(lat[j]))*integrate.cumtrapz(zonal_v[i,::-1,j], p[i,::-1,j], initial=0)
     
     msf = martians_month(ls, tmp)
     p_field = martians_month(ls, p)
+<<<<<<< HEAD
     
     slev = np.logspace(5,11,10)
     slev = np.hstack([-1*slev[::-1],slev])
@@ -461,6 +479,11 @@ def msf(filedir):
     norm = True
 #    norm = matplotlib.colors.Normalize(vmin=-1.,vmax=1.)
     zonal_plt_monthly(p_field, ls, msf, 'Mean Meridional Streamfunction', slev, norm, 'viridis')
+=======
+    print (tmp.shape)
+#    norm = matplotlib.colors.Normalize(vmin=-1.,vmax=1.)
+    zonal_plt_monthly(p_field, ls, msf, 'Mean Meridional Streamfunction', np.linspace(-1.2e9, 4e9, 12), 'viridis')
+>>>>>>> 4f814091e85a7cba85d9124e0661a75364f44ef6
     
 def bandpass_filter(filedir):
       
