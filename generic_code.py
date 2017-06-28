@@ -302,15 +302,14 @@ def fft_tides(filedir, var1, var2):
     filepath = glob.glob(filedir + '*_LS.npy')[0]
     ls = np.load(filepath)[3::8]
     
-    filepath = glob.glob(filedir + '*_ls_AUX9.npy')
-    if filepath:
-        filepath = filepath[0]
-        ls_aux9 = np.load(filepath)
-        print(ls_aux9[-1])
-        
-        idx = np.where(ls_aux9[0] == ls)[0]
-        ls = ls[idx[0]:]
-        p = p[idx[0]:]
+#    filepath = glob.glob(filedir + '*_ls_AUX9.npy')
+#    if filepath:
+#        filepath = filepath[0]
+#        ls_aux9 = np.load(filepath)
+#        
+#        idx = np.where(ls_aux9[0] == ls)[0]
+#        ls = ls[idx[0]:]
+#        p = p[idx[0]:]
 
     t_d_2Pa = martians_year(ls, t_d_2Pa)
     p = martians_year(ls, p)
@@ -380,19 +379,16 @@ def zonal_diff(filedir, var1, var2):
     filepath = glob.glob(filedir + '*_LS.npy')[0]
     ls = np.load(filepath)[7::8]
     
-    print (ls.shape, t_d.shape)
-    
     filepath = glob.glob(filedir + '*_ls_AUX9.npy')
     if filepath:
         filepath = filepath[0]
         ls_aux9 = np.load(filepath)
-        print(ls_aux9[-1])
         
         idx = np.where(ls_aux9[0] == ls)[0]
         ls = ls[idx[0]:]
         p = p[idx[0]:]
 
-    t_d = martians_year(ls, t_d)
+    t_d = martians_year(ls, t_d.mean(axis=3))
     t_d_2Pa = martians_year(ls, t_d_2Pa)
     p = martians_year(ls, p)
     ls = martians_year(ls,ls)
@@ -404,14 +400,9 @@ def zonal_diff(filedir, var1, var2):
     zonal_p = martians_month(ls, p)
     print (t_d.shape)
     
-    ampl = np.fft.fftshift(np.fft.fft2(t_d, axes=[3]), axes=[3])
-    tmp = np.fft.fftshift(np.fft.fftfreq(72, 5))*360
-    idx = np.where(abs(tmp)!=0)[0]
-    ampl[:,:,:,idx] = 0
-    ampl = np.fft.ifft2(np.fft.ifftshift(ampl, axes=[3]), axes=[3])
     print ('Saving 2nd shit')
     
-    zonal_t_d = martians_month(ls, ampl.mean(axis=3))
+    zonal_t_d = martians_month(ls, t_d)
     print (level)
     zonal_plt_monthly(zonal_p, ls, zonal_t_d, 'T$_{\mathrm{'+name+'}}$', level, False, 'viridis')
         
