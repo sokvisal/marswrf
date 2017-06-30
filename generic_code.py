@@ -11,22 +11,33 @@ from matplotlib.backends.backend_pdf import PdfPages
 import os
 import glob
 import sys
+from matplotlib.colors import ListedColormap
+import seaborn as sns
 from tqdm import tqdm
 
 from matplotlib.ticker import AutoMinorLocator
-matplotlib.rcParams.update({'font.size': 10})
+matplotlib.rcParams.update({'font.size': 20})
 
-matplotlib.rcParams['lines.linewidth'] = 0.5
+cmap = sns.cubehelix_palette(light=1, as_cmap=True, reverse=True)
+cmap = ListedColormap(sns.color_palette("coolwarm", 9).as_hex())
+sns.reset_orig()
+
+matplotlib.rcParams['lines.linewidth'] = 1.5
+matplotlib.rcParams['axes.linewidth'] = 1.5
+matplotlib.rcParams['figure.dpi'] = 200
+matplotlib.rcParams['axes.facecolor'] = '#F8F8FF'
+matplotlib.rcParams['axes.grid'] = True
+matplotlib.rcParams['axes.axisbelow'] = True
 
 matplotlib.rcParams['xtick.major.size'] = 5
-matplotlib.rcParams['xtick.major.width'] = 2
+matplotlib.rcParams['xtick.major.width'] = 1.5
 matplotlib.rcParams['xtick.minor.size'] = 3
-matplotlib.rcParams['xtick.minor.width'] = 1.5
+matplotlib.rcParams['xtick.minor.width'] = 1.
 
 matplotlib.rcParams['ytick.major.size'] = 5
-matplotlib.rcParams['ytick.major.width'] = 2
+matplotlib.rcParams['ytick.major.width'] = 1.5
 matplotlib.rcParams['ytick.minor.size'] = 3
-matplotlib.rcParams['ytick.minor.width'] = 1.5
+matplotlib.rcParams['ytick.minor.width'] = 1.
                    
 directory = str(sys.argv[1])
 call_function = str(sys.argv[2])
@@ -300,7 +311,7 @@ def fft_tides(filedir, var1, var2):
     t_d_2Pa = np.load(filepath)
     
     filepath = glob.glob(filedir + '*_LS.npy')[0]
-    ls = np.load(filepath)[3::8]
+    ls = np.load(filepath)[::2]
     
 #    filepath = glob.glob(filedir + '*_ls_AUX9.npy')
 #    if filepath:
@@ -341,15 +352,17 @@ def fft_tides(filedir, var1, var2):
     amplitude = ampList[0].reshape((223,3,36)).mean(axis=1)
     
     im = ax.contourf(tmpls, tmplat, amplitude, levels=level, extend='both', cmap='viridis')
-    ax.set_title(r'{} [m={}]'.format('T$_{\mathrm{'+name+'}}$',i))
+    for c in im.collections:
+        c.set_edgecolor("face")
+    ax.set_title(r'{} [m={}]'.format('T$_{\mathrm{'+name+'}}$',0))
     if i in [0]:
         ax.set_ylabel('Latitude [$^\circ$]')
     ax.set_xlabel('Solar Longitude')
     
-    ax.xaxis.set_minor_locator(AutoMinorLocator(6))
-    ax.yaxis.set_minor_locator(AutoMinorLocator(5))
+    ax.xaxis.set_minor_locator(AutoMinorLocator(5))
+    ax.yaxis.set_minor_locator(AutoMinorLocator(4))
     fig.tight_layout()
-    fig.colorbar(im, shrink=0.45, orientation='horizontal', pad=0.12)
+    fig.colorbar(im, shrink=0.7, orientation='vertical', pad=0.025)
     plt.savefig(pdFfigures, format='pdf', bbox_inches='tight', dpi=400) #filedir+'wavenumber_timeseries_{}.pdf'.format('t'+name)
 
 def zonal_diff(filedir, var1, var2):
@@ -465,7 +478,7 @@ def msf(filedir):
 
 def bandpass_filter(filedir):
       
-    filepath = glob.glob(filedir + '*_T2KM.npy')[0]
+    filepath = glob.glob(filedir + '*t_PSFC.npy')[0] #T2KM
     psfc = np.load(filepath)
     psfc = psfc - psfc.mean(axis=0)
     
@@ -483,7 +496,7 @@ def bandpass_filter(filedir):
     wlen = 1+20/0.25
     
     decomp = False
-    dy = np.sqrt(window_stdev(y, int(wlen/2)))
+    dy = window_stdev(y, int(wlen/2))
     print(dy.shape)
     if decomp:
         dy = np.fft.fftshift(np.fft.fftn(dy, axes=[2]), axes=[2])
@@ -601,8 +614,8 @@ if call_function == 'hovmoller':
         hovmoller(directory, bandpass)
 if call_function == 'tides':
     with PdfPages(directory+'fftTides.pdf') as pdFfigures:
-        fft_tides(directory, '*_TDIFF.npy', '*_PHY_DIFF2PA.npy')
-        fft_tides(directory, '*_TAVG.npy', '*_PHY_AVG2PA.npy')
+        fft_tides(directory, '*_TDIFF.npy', '*_TDIFF2PA.npy')
+        fft_tides(directory, '*_TAVG.npy', '*_TAVG2PA.npy')
 
 def net_hr_aer(filename, ls1, ls2):
     nc_file = filename
