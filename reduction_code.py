@@ -160,15 +160,15 @@ def init_reduction(filedir):
                 tmp = tmp + tmp2
         
         def create3D_var(varnameList, units, data):   
-            tmp2 = dataset.createVariable(varnameList[0], np.float32, (varnameList[1], varnameList[2], varnameList[3],))
+            tmp2 = dataset.createVariable(varnameList[0], np.float32, (varnameList[1], varnameList[2], varnameList[3],), zlib=True)
             tmp2.units = (units)
             tmp2[:] = data
         def create4D_var(varnameList, units, data):   
-            tmp2 = dataset.createVariable(varnameList[0], np.float32, (varnameList[1], varnameList[2], varnameList[3], varnameList[4],))
+            tmp2 = dataset.createVariable(varnameList[0], np.float32, (varnameList[1], varnameList[2], varnameList[3], varnameList[4],), zlib=True)
             tmp2.units = (units)
             tmp2[:] = data
         
-        dataset = Dataset('./r14p1dustL45_test.nc', 'w')
+        dataset = Dataset('./test2.nc', 'w')
         
         solar_long = dataset.createDimension('time', None)
         pressure = dataset.createDimension('bottom_top', None)
@@ -412,5 +412,5 @@ def init_reduction(filedir):
             print ('Tarring file,', i)            
             tar.add(i, arcname = i.replace(filedir, ''))
             tar.close()
-init_reduction('./../r14p1dustL40')
+init_reduction('./../r14p1dustL45')
  
