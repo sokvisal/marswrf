@@ -51,45 +51,45 @@ def load_zm(filename, data, varlist):
             tmp.append(tmp2[:,:,16:20,60:64])
     return ls, tmp
 
-def load_zm(filename, data, varlist):
-    t0 = 300. #data.variables['T00'][:] # base temperature
-    p0 = 610. #data.variables['P00'][:] # base pressure
-    r_d = 191.8366
-    cp = 767.3466
-    g = 3.727
-    gamma = r_d/cp
-    
-    ls = data.variables['L_S'][:] # solar long
-    
-    tmp = []
-    for var in varlist:
-        if var == 'T':
-            t = data.variables['T'][:]#[:,:,16:] # perturbation potential temp
-            
-            p = data.variables['P'][:]#[:,:,16:] # perturbation pressure
-            pb = data.variables['PB'][:]#[:,:,16:] # base state pressure
-            
-            pot_temp = t + t0 # potential temperature
-            p = p + pb # pressure
-            del t, pb
-            
-            tmp.append((pot_temp*(p/p0)**gamma)) # temperature
-            tmp.append(p.mean(axis=3))
-        elif var == 'PH':
-            ph = data.variables['PH'][:][:,:,16:].mean(axis = 3)
-            phb = data.variables['PHB'][:][:,:,16:].mean(axis = 3)
-            
-            tmp.append((ph+phb)/(1000*g))
-        elif var == 'U':
-            u = data.variables['U'][:]
-            tmp.append(u[:,:,16:20,61:65])
-        elif var == 'PSFC':
-            u = data.variables['PSFC'][:][:,16:20,60:64]
-            tmp.append(u)
-        else: 
-            tmp2 = data.variables[var][:][:,:,16:]
-            tmp.append(tmp2)
-    return ls, tmp
+#def load_zm(filename, data, varlist):
+#    t0 = 300. #data.variables['T00'][:] # base temperature
+#    p0 = 610. #data.variables['P00'][:] # base pressure
+#    r_d = 191.8366
+#    cp = 767.3466
+#    g = 3.727
+#    gamma = r_d/cp
+#    
+#    ls = data.variables['L_S'][:] # solar long
+#    
+#    tmp = []
+#    for var in varlist:
+#        if var == 'T':
+#            t = data.variables['T'][:]#[:,:,16:] # perturbation potential temp
+#            
+#            p = data.variables['P'][:]#[:,:,16:] # perturbation pressure
+#            pb = data.variables['PB'][:]#[:,:,16:] # base state pressure
+#            
+#            pot_temp = t + t0 # potential temperature
+#            p = p + pb # pressure
+#            del t, pb
+#            
+#            tmp.append((pot_temp*(p/p0)**gamma)) # temperature
+#            tmp.append(p.mean(axis=3))
+#        elif var == 'PH':
+#            ph = data.variables['PH'][:][:,:,16:].mean(axis = 3)
+#            phb = data.variables['PHB'][:][:,:,16:].mean(axis = 3)
+#            
+#            tmp.append((ph+phb)/(1000*g))
+#        elif var == 'U':
+#            u = data.variables['U'][:]
+#            tmp.append(u[:,:,16:20,61:65])
+#        elif var == 'PSFC':
+#            u = data.variables['PSFC'][:][:,16:20,60:64]
+#            tmp.append(u)
+#        else: 
+#            tmp2 = data.variables[var][:][:,:,16:]
+#            tmp.append(tmp2)
+#    return ls, tmp
 
 def load_misc(filename, data, var_name):
     var = var_name + '_AM'
