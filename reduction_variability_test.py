@@ -46,7 +46,7 @@ def load_zm(filename, data, varlist):
     return ls, tmp
 
 
-filedir = './../pw.v.wet/WRFV3/run'
+filedir = './../model_run/dustL60'
 filepath = filedir + '/wrfout_d01*'
 print (filepath)
 
@@ -88,7 +88,7 @@ def create4D_var(varnameList, units, data):
     tmp2.units = (units)
     tmp2[:] = data
 
-dataset = Dataset('./wet_test.nc', 'w')
+dataset = Dataset('./dustL60_test.nc', 'w')
 
 varlen = varlist.size + 1
 time_dim = np.vstack(tmp[0::varlen]).shape[0]
@@ -104,7 +104,7 @@ long = dataset.createVariable('LONG', np.float32, ('west_east',))
 
 ls.units = ('Solar Longtitude')
 ls[:] = lsd
-print np.hstack(tmp[2::varlen]).shape, np.vstack(tmp[1::varlen]).shape,
+
 create2D_var(['T', 'time', 'bottom_top'], 'K (measured at the equator)', np.vstack(tmp[0::varlen]))
 create2D_var(['P', 'time', 'bottom_top'], 'Pa (measured at the equator)', np.vstack(tmp[1::varlen]))
 create_var(['PSFC', 'time'], 'Pa (measured at the equator)', np.hstack(tmp[2::varlen]))
