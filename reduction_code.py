@@ -199,23 +199,13 @@ def init_reduction(filedir):
         b = np.linspace(-180,180,72)
         a = np.linspace(-90,90,36)
         ls[:] = lsd
-        lat[:] = a[16:]
+        lat[:] = a
         long[:] = b
 #        lat[:] = np.array([-7.71428571, -2.57142857,  2.57142857,  7.71428571])
 #        long[:] = np.array([ 124.22535211,  129.29577465,  134.36619718,  139.43661972])
 #        long_u[:] = np.array([ 125.,  130.,  135., 140.])
         
         dataset.close()
-        
-#        filedir2 = i.replace(i,'{}/reduction/wrfout_{}'.format(filedir, 'ls'))
-#        np.save(filedir2, ls)
-#        del ls
-#        
-##        varlist.insert(1, 'P')
-#        for j, var in enumerate(varlist):
-#            filedir2 = i.replace(i,'{}/reduction/wrfout_ {}'.format(filedir, var+'FULL2'))
-#            print('Saving', var)
-#            np.save(filedir2, tmp[j])
             
     def wrfout_ext():
         filepath = filedir + '/wrfout_d01*'
@@ -355,11 +345,11 @@ def init_reduction(filedir):
                 tmp = tmp + tmp2
           
         def create3D_var(varnameList, units, data):   
-            tmp2 = dataset.createVariable(varnameList[0], np.float32, (varnameList[1], varnameList[2], varnameList[3],))
+            tmp2 = dataset.createVariable(varnameList[0], np.float32, (varnameList[1], varnameList[2], varnameList[3],), zlib=True)
             tmp2.units = (units)
             tmp2[:] = data
         def create4D_var(varnameList, units, data):   
-            tmp2 = dataset.createVariable(varnameList[0], np.float32, (varnameList[1], varnameList[2], varnameList[3], varnameList[4],))
+            tmp2 = dataset.createVariable(varnameList[0], np.float32, (varnameList[1], varnameList[2], varnameList[3], varnameList[4],), zlib=True)
             tmp2.units = (units)
             tmp2[:] = data
         
