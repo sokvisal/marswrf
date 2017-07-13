@@ -38,7 +38,7 @@ def load_zm(filename, data, varlist):
             u = data.variables['U'][:]
             tmp.append(u[:,:,16:20,61:65])
         elif var == 'PSFC':
-            u = data.variables['PSFC'][:][:,17:20].mean(axis=3).mean(axis=2)
+            u = data.variables['PSFC'][:][:,17:20].mean(axis=2).mean(axis=1)
             tmp.append(u)
         else: 
             tmp2 = data.variables[var][:]
@@ -46,7 +46,7 @@ def load_zm(filename, data, varlist):
     return ls, tmp
 
 
-filedir = './../pw.v.dust/WRFV3/run'
+filedir = './../model_run/dustL60'
 filepath = filedir + '/wrfout_d01*'
 print (filepath)
 
@@ -71,6 +71,14 @@ for num, i in enumerate(sorted(glob.glob(filepath)[:])):
         lsd = np.concatenate((lsd, lsd2))
         tmp = tmp + tmp2
 
+def create_var(varnameList, units, data):
+    tmp2 = dataset.createVariable(varnameList[0], np.float32, (varnameList[1],), zlib=True)
+    tmp2.units = (units)
+    tmp2[:] = data
+def create2D_var(varnameList, units, data):
+    tmp2 = dataset.createVariable(varnameList[0], np.float32, (varnameList[1], varnameList[2],), zlib=True)
+    tmp2.units = (units)
+    tmp2[:] = data
 def create3D_var(varnameList, units, data):   
     tmp2 = dataset.createVariable(varnameList[0], np.float32, (varnameList[1], varnameList[2], varnameList[3],), zlib=True)
     tmp2.units = (units)
@@ -80,14 +88,13 @@ def create4D_var(varnameList, units, data):
     tmp2.units = (units)
     tmp2[:] = data
 
-dataset = Dataset('./r14p1dustL45_test.nc', 'w')
+dataset = Dataset('./dustL60_test.nc', 'w')
 
 varlen = varlist.size + 1
 time_dim = np.vstack(tmp[0::varlen]).shape[0]
 
 solar_long = dataset.createDimension('time', time_dim)
 pressure = dataset.createDimension('bottom_top', None)
-height = dataset.createDimension('bottom_top_stag', None)
 latitude = dataset.createDimension('south_north', None)
 longitude = dataset.createDimension('west_east', None)
 
@@ -98,9 +105,9 @@ long = dataset.createVariable('LONG', np.float32, ('west_east',))
 ls.units = ('Solar Longtitude')
 ls[:] = lsd
 
-create4D_var(['T', 'time', 'bottom_top', 'south_north', 'west_east'], 'K', np.vstack(tmp[0::varlen]))
-create3D_var(['P', 'time', 'bottom_top', 'south_north'], 'Pa', np.vstack(tmp[1::varlen]))
-create3D_var(['PSFC', 'time', 'bottom_top_stag', 'south_north'], 'km', np.vstack(tmp[2::varlen]))
+create2D_var(['T', 'time', 'bottom_top'], 'K (measured at the equator)', np.vstack(tmp[0::varlen]))
+create2D_var(['P', 'time', 'bottom_top'], 'Pa (measured at the equator)', np.vstack(tmp[1::varlen]))
+create_var(['PSFC', 'time'], 'Pa (measured at the equator)', np.hstack(tmp[2::varlen]))
 
 #lat.units = ('Degree')
 #b = np.linspace(-180,180,72)
