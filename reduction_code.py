@@ -51,45 +51,45 @@ def load_zm(filename, data, varlist):
             tmp.append(tmp2[:,:,16:20,60:64])
     return ls, tmp
 
-#def load_zm(filename, data, varlist):
-#    t0 = 300. #data.variables['T00'][:] # base temperature
-#    p0 = 610. #data.variables['P00'][:] # base pressure
-#    r_d = 191.8366
-#    cp = 767.3466
-#    g = 3.727
-#    gamma = r_d/cp
-#    
-#    ls = data.variables['L_S'][:] # solar long
-#    
-#    tmp = []
-#    for var in varlist:
-#        if var == 'T':
-#            t = data.variables['T'][:]#[:,:,16:] # perturbation potential temp
-#            
-#            p = data.variables['P'][:]#[:,:,16:] # perturbation pressure
-#            pb = data.variables['PB'][:]#[:,:,16:] # base state pressure
-#            
-#            pot_temp = t + t0 # potential temperature
-#            p = p + pb # pressure
-#            del t, pb
-#            
-#            tmp.append((pot_temp*(p/p0)**gamma)) # temperature
-#            tmp.append(p.mean(axis=3))
-#        elif var == 'PH':
-#            ph = data.variables['PH'][:][:,:,16:].mean(axis = 3)
-#            phb = data.variables['PHB'][:][:,:,16:].mean(axis = 3)
-#            
-#            tmp.append((ph+phb)/(1000*g))
-#        elif var == 'U':
-#            u = data.variables['U'][:]
-#            tmp.append(u[:,:,16:20,61:65])
-#        elif var == 'PSFC':
-#            u = data.variables['PSFC'][:][:,16:20,60:64]
-#            tmp.append(u)
-#        else: 
-#            tmp2 = data.variables[var][:][:,:,16:]
-#            tmp.append(tmp2)
-#    return ls, tmp
+def load_zm(filename, data, varlist):
+    t0 = 300. #data.variables['T00'][:] # base temperature
+    p0 = 610. #data.variables['P00'][:] # base pressure
+    r_d = 191.8366
+    cp = 767.3466
+    g = 3.727
+    gamma = r_d/cp
+    
+    ls = data.variables['L_S'][:] # solar long
+    
+    tmp = []
+    for var in varlist:
+        if var == 'T':
+            t = data.variables['T'][:]#[:,:,16:] # perturbation potential temp
+            
+            p = data.variables['P'][:]#[:,:,16:] # perturbation pressure
+            pb = data.variables['PB'][:]#[:,:,16:] # base state pressure
+            
+            pot_temp = t + t0 # potential temperature
+            p = p + pb # pressure
+            del t, pb
+            
+            tmp.append((pot_temp*(p/p0)**gamma)) # temperature
+            tmp.append(p.mean(axis=3))
+        elif var == 'PH':
+            ph = data.variables['PH'][:][:,:,16:].mean(axis = 3)
+            phb = data.variables['PHB'][:][:,:,16:].mean(axis = 3)
+            
+            tmp.append((ph+phb)/(1000*g))
+        elif var == 'U':
+            u = data.variables['U'][:]
+            tmp.append(u[:,:,16:20,61:65])
+        elif var == 'PSFC':
+            u = data.variables['PSFC'][:][:,16:20,60:64]
+            tmp.append(u)
+        else: 
+            tmp2 = data.variables[var][:][:,:,16:]
+            tmp.append(tmp2)
+    return ls, tmp
 
 def load_misc(filename, data, var_name):
     var = var_name + '_AM'
@@ -199,13 +199,23 @@ def init_reduction(filedir):
         b = np.linspace(-180,180,72)
         a = np.linspace(-90,90,36)
         ls[:] = lsd
-        lat[:] = a
+        lat[:] = a[16:]
         long[:] = b
 #        lat[:] = np.array([-7.71428571, -2.57142857,  2.57142857,  7.71428571])
 #        long[:] = np.array([ 124.22535211,  129.29577465,  134.36619718,  139.43661972])
 #        long_u[:] = np.array([ 125.,  130.,  135., 140.])
         
         dataset.close()
+        
+#        filedir2 = i.replace(i,'{}/reduction/wrfout_{}'.format(filedir, 'ls'))
+#        np.save(filedir2, ls)
+#        del ls
+#        
+##        varlist.insert(1, 'P')
+#        for j, var in enumerate(varlist):
+#            filedir2 = i.replace(i,'{}/reduction/wrfout_ {}'.format(filedir, var+'FULL2'))
+#            print('Saving', var)
+#            np.save(filedir2, tmp[j])
             
     def wrfout_ext():
         filepath = filedir + '/wrfout_d01*'
@@ -345,11 +355,11 @@ def init_reduction(filedir):
                 tmp = tmp + tmp2
           
         def create3D_var(varnameList, units, data):   
-            tmp2 = dataset.createVariable(varnameList[0], np.float32, (varnameList[1], varnameList[2], varnameList[3],), zlib=True)
+            tmp2 = dataset.createVariable(varnameList[0], np.float32, (varnameList[1], varnameList[2], varnameList[3],))
             tmp2.units = (units)
             tmp2[:] = data
         def create4D_var(varnameList, units, data):   
-            tmp2 = dataset.createVariable(varnameList[0], np.float32, (varnameList[1], varnameList[2], varnameList[3], varnameList[4],), zlib=True)
+            tmp2 = dataset.createVariable(varnameList[0], np.float32, (varnameList[1], varnameList[2], varnameList[3], varnameList[4],))
             tmp2.units = (units)
             tmp2[:] = data
         
