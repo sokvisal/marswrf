@@ -412,5 +412,5 @@ def init_reduction(filedir):
             print ('Tarring file,', i)            
             tar.add(i, arcname = i.replace(filedir, ''))
             tar.close()
-init_reduction('./../r14p1dustL45')
+init_reduction('./../diag.r14p1dustL45')
  
