@@ -37,8 +37,8 @@ def load_zm(filename, data, varlist):
         elif var == 'U':
             u = data.variables['U'][:]
             tmp.append(u[:,:,16:20,61:65])
-        elif var == 'PSFC' | var == 'TSK':
-            u = data.variables['PSFC'][:]
+        elif var == 'PSFC' or var == 'TSK':
+            u = data.variables[var][:]
             tmp.append(u)
         else: 
             tmp2 = data.variables[var][:]
@@ -46,7 +46,7 @@ def load_zm(filename, data, varlist):
     return ls, tmp
 
 
-filedir = './../model_run/dustL60'
+filedir = './../model_run/dustL45'
 filepath = filedir + '/wrfout_d01*'
 print (filepath)
 
@@ -88,7 +88,7 @@ def create4D_var(varnameList, units, data):
     tmp2.units = (units)
     tmp2[:] = data
 
-dataset = Dataset('./dustL60_test.nc', 'w')
+dataset = Dataset('./dustL45_test.nc', 'w')
 
 varlen = varlist.size + 1
 time_dim = np.vstack(tmp[0::varlen]).shape[0]
@@ -107,8 +107,8 @@ ls[:] = lsd
 
 create2D_var(['T', 'time', 'bottom_top'], 'K (measured at the equator)', np.vstack(tmp[0::varlen]))
 create2D_var(['P', 'time', 'bottom_top'], 'Pa (measured at the equator)', np.vstack(tmp[1::varlen]))
-create3D_var(['PSFC', 'time', 'south_north', 'west_east'], 'Pa (Surface Pressure)', np.hstack(tmp[2::varlen]))
-create3D_var(['TSK', 'time', 'south_north', 'west_east'], 'K (Surface Temperature)', np.hstack(tmp[3::varlen]))
+create3D_var(['PSFC', 'time', 'south_north', 'west_east'], 'Pa (Surface Pressure)', np.vstack(tmp[2::varlen]))
+create3D_var(['TSK', 'time', 'south_north', 'west_east'], 'K (Surface Temperature)', np.vstack(tmp[3::varlen]))
 
 #lat.units = ('Degree')
 #b = np.linspace(-180,180,72)
