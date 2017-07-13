@@ -37,8 +37,8 @@ def load_zm(filename, data, varlist):
         elif var == 'U':
             u = data.variables['U'][:]
             tmp.append(u[:,:,16:20,61:65])
-        elif var == 'PSFC':
-            u = data.variables['PSFC'][:][:,17:20].mean(axis=2).mean(axis=1)
+        elif var == 'PSFC' | var == 'TSK':
+            u = data.variables['PSFC'][:]
             tmp.append(u)
         else: 
             tmp2 = data.variables[var][:]
@@ -53,7 +53,7 @@ print (filepath)
 if not os.path.exists(filedir+'/reduction'): 
     os.mkdir(filedir+'/reduction')
 
-varlist = np.array(['T', 'PSFC'])
+varlist = np.array(['T', 'PSFC', 'TSK'])
 for num, i in enumerate(sorted(glob.glob(filepath)[:])):
     print (i)
     if num == 0:
@@ -107,7 +107,8 @@ ls[:] = lsd
 
 create2D_var(['T', 'time', 'bottom_top'], 'K (measured at the equator)', np.vstack(tmp[0::varlen]))
 create2D_var(['P', 'time', 'bottom_top'], 'Pa (measured at the equator)', np.vstack(tmp[1::varlen]))
-create_var(['PSFC', 'time'], 'Pa (measured at the equator)', np.hstack(tmp[2::varlen]))
+create3D_var(['PSFC', 'time', 'south_north', 'west_east'], 'Pa (Surface Pressure)', np.hstack(tmp[2::varlen]))
+create3D_var(['TSK', 'time', 'south_north', 'west_east'], 'K (Surface Temperature)', np.hstack(tmp[3::varlen]))
 
 #lat.units = ('Degree')
 #b = np.linspace(-180,180,72)
