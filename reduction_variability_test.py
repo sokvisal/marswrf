@@ -18,17 +18,17 @@ def load_zm(filename, data, varlist):
     tmp = []
     for var in varlist:
         if var == 'T':
-            t = data.variables['T'][:][:,:,17:20] # perturbation potential temp
+            t = data.variables['T'][:][:,25:30] # perturbation potential temp
             
-            p = data.variables['P'][:][:,:,17:20] # perturbation pressure
-            pb = data.variables['PB'][:][:,:,17:20] # base state pressure
+            p = data.variables['P'][:][:,25:30] # perturbation pressure
+            pb = data.variables['PB'][:][:,25:30] # base state pressure
             
             pot_temp = t + t0 # potential temperature
             p = p + pb # pressure
             del t, pb
             
-            tmp.append((pot_temp*(p/p0)**gamma).mean(axis=3).mean(axis=2)) # temperature
-            tmp.append(p.mean(axis=3).mean(axis=2))
+            tmp.append((pot_temp*(p/p0)**gamma).mean(axis=1)) # temperature
+            tmp.append(p.mean(axis=1))
         elif var == 'PH':
             ph = data.variables['PH'][:]
             phb = data.variables['PHB'][:]
@@ -46,7 +46,7 @@ def load_zm(filename, data, varlist):
     return ls, tmp
 
 
-filedir = './../model_run/dustL45'
+filedir = './../pw.v.dust/WRFV3/run/'
 filepath = filedir + '/wrfout_d01*'
 print (filepath)
 
@@ -88,7 +88,7 @@ def create4D_var(varnameList, units, data):
     tmp2.units = (units)
     tmp2[:] = data
 
-dataset = Dataset('./dustL45_test.nc', 'w')
+dataset = Dataset('./dustL45_p0.015.nc', 'w')
 
 varlen = varlist.size + 1
 time_dim = np.vstack(tmp[0::varlen]).shape[0]
@@ -105,8 +105,8 @@ long = dataset.createVariable('LONG', np.float32, ('west_east',))
 ls.units = ('Solar Longtitude')
 ls[:] = lsd
 
-create2D_var(['T', 'time', 'bottom_top'], 'K (measured at the equator)', np.vstack(tmp[0::varlen]))
-create2D_var(['P', 'time', 'bottom_top'], 'Pa (measured at the equator)', np.vstack(tmp[1::varlen]))
+create3D_var(['T50Pa', 'time', 'south_north', 'west_east'], 'K (measured @equator @50 Pa)', np.vstack(tmp[0::varlen]))
+create3D_var(['P', 'time', 'south_north', 'west_east'], 'K (measured @equator @50 Pa)', np.vstack(tmp[1::varlen]))
 create3D_var(['PSFC', 'time', 'south_north', 'west_east'], 'Pa (Surface Pressure)', np.vstack(tmp[2::varlen]))
 create3D_var(['TSK', 'time', 'south_north', 'west_east'], 'K (Surface Temperature)', np.vstack(tmp[3::varlen]))
 
