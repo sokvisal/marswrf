@@ -43,53 +43,53 @@ def load_zm(filename, data, varlist):
         elif var == 'U':
             u = data.variables['U'][:]
             tmp.append(u[:,:,16:20,61:65])
-        elif var == 'PSFC':
-            u = data.variables['PSFC'][:][:,16:20,60:64]
+        elif var == 'PSFC' or var == 'TSK':
+            u = data.variables[var][:][:,16:20,60:64]
             tmp.append(u)
         else: 
             tmp2 = data.variables[var][:]
             tmp.append(tmp2[:,:,16:20,60:64])
     return ls, tmp
 
-def load_zm(filename, data, varlist):
-    t0 = 300. #data.variables['T00'][:] # base temperature
-    p0 = 610. #data.variables['P00'][:] # base pressure
-    r_d = 191.8366
-    cp = 767.3466
-    g = 3.727
-    gamma = r_d/cp
-    
-    ls = data.variables['L_S'][:] # solar long
-    
-    tmp = []
-    for var in varlist:
-        if var == 'T':
-            t = data.variables['T'][:]#[:,:,16:] # perturbation potential temp
-            
-            p = data.variables['P'][:]#[:,:,16:] # perturbation pressure
-            pb = data.variables['PB'][:]#[:,:,16:] # base state pressure
-            
-            pot_temp = t + t0 # potential temperature
-            p = p + pb # pressure
-            del t, pb
-            
-            tmp.append((pot_temp*(p/p0)**gamma)) # temperature
-            tmp.append(p.mean(axis=3))
-        elif var == 'PH':
-            ph = data.variables['PH'][:][:,:,16:].mean(axis = 3)
-            phb = data.variables['PHB'][:][:,:,16:].mean(axis = 3)
-            
-            tmp.append((ph+phb)/(1000*g))
-        elif var == 'U':
-            u = data.variables['U'][:]
-            tmp.append(u[:,:,16:20,61:65])
-        elif var == 'PSFC':
-            u = data.variables['PSFC'][:][:,16:20,60:64]
-            tmp.append(u)
-        else: 
-            tmp2 = data.variables[var][:][:,:,16:]
-            tmp.append(tmp2)
-    return ls, tmp
+#def load_zm(filename, data, varlist):
+#    t0 = 300. #data.variables['T00'][:] # base temperature
+#    p0 = 610. #data.variables['P00'][:] # base pressure
+#    r_d = 191.8366
+#    cp = 767.3466
+#    g = 3.727
+#    gamma = r_d/cp
+#    
+#    ls = data.variables['L_S'][:] # solar long
+#    
+#    tmp = []
+#    for var in varlist:
+#        if var == 'T':
+#            t = data.variables['T'][:]#[:,:,16:] # perturbation potential temp
+#            
+#            p = data.variables['P'][:]#[:,:,16:] # perturbation pressure
+#            pb = data.variables['PB'][:]#[:,:,16:] # base state pressure
+#            
+#            pot_temp = t + t0 # potential temperature
+#            p = p + pb # pressure
+#            del t, pb
+#            
+#            tmp.append((pot_temp*(p/p0)**gamma)) # temperature
+#            tmp.append(p.mean(axis=3))
+#        elif var == 'PH':
+#            ph = data.variables['PH'][:][:,:,16:].mean(axis = 3)
+#            phb = data.variables['PHB'][:][:,:,16:].mean(axis = 3)
+#            
+#            tmp.append((ph+phb)/(1000*g))
+#        elif var == 'U':
+#            u = data.variables['U'][:]
+#            tmp.append(u[:,:,16:20,61:65])
+#        elif var == 'PSFC':
+#            u = data.variables['PSFC'][:][:,16:20,60:64]
+#            tmp.append(u)
+#        else: 
+#            tmp2 = data.variables[var][:][:,:,16:]
+#            tmp.append(tmp2)
+#    return ls, tmp
 
 def load_misc(filename, data, var_name):
     var = var_name + '_AM'
@@ -338,7 +338,7 @@ def init_reduction(filedir):
     def misc():
         filepath2 = filedir+'/wrfout*'
         
-        varlist = ['T', 'U', 'PSFC']
+        varlist = np.array(['T', 'U', 'PSFC', 'TSK'])
         for num, i in enumerate(tqdm(sorted(glob.glob(filepath2)))):
             if num == 0:
                 nc_file = i
@@ -355,19 +355,21 @@ def init_reduction(filedir):
                 tmp = tmp + tmp2
           
         def create3D_var(varnameList, units, data):   
-            tmp2 = dataset.createVariable(varnameList[0], np.float32, (varnameList[1], varnameList[2], varnameList[3],))
+            tmp2 = dataset.createVariable(varnameList[0], np.float32, (varnameList[1], varnameList[2], varnameList[3],), zlib=True)
             tmp2.units = (units)
             tmp2[:] = data
         def create4D_var(varnameList, units, data):   
-            tmp2 = dataset.createVariable(varnameList[0], np.float32, (varnameList[1], varnameList[2], varnameList[3], varnameList[4],))
+            tmp2 = dataset.createVariable(varnameList[0], np.float32, (varnameList[1], varnameList[2], varnameList[3], varnameList[4],), zlib=True)
             tmp2.units = (units)
             tmp2[:] = data
         
-        dataset = Dataset('./r14p1_galeCrater.nc', 'w')
+        dataset = Dataset('./r14p1dustL45_galeCrater.nc', 'w')
         
         # create complex128 compound data type.
     #    complex64 = np.dtype([("real",np.float32),("imag",np.float32)])
     #    c64 = dataset.createCompoundType(complex64, "complex64")
+    
+        varlen = varlist.size + 1
         
         solar_long = dataset.createDimension('time', None)
         pressure = dataset.createDimension('bottom_top', None)
@@ -380,10 +382,11 @@ def init_reduction(filedir):
         long = dataset.createVariable('LONG', np.float32, ('west_east',))
         long_u = dataset.createVariable('LONG_U', np.float32, ('west_east_stag',))
             
-        create4D_var(['PHY_T', 'time', 'bottom_top', 'south_north', 'west_east'], 'K', np.vstack(tmp[0::4]))
-        create4D_var(['P', 'time', 'bottom_top', 'south_north', 'west_east'], 'Pa', np.vstack(tmp[1::4]))
-        create4D_var(['U', 'time', 'bottom_top', 'south_north', 'west_east_stag'], 'm s-1', np.vstack(tmp[2::4]))
-        create3D_var(['PSFC', 'time', 'south_north', 'west_east'], 'Pa', np.vstack(tmp[3::4]))
+        create4D_var(['PHY_T', 'time', 'bottom_top', 'south_north', 'west_east'], 'K', np.vstack(tmp[0::varlen]))
+        create4D_var(['P', 'time', 'bottom_top', 'south_north', 'west_east'], 'Pa', np.vstack(tmp[1::varlen]))
+        create4D_var(['U', 'time', 'bottom_top', 'south_north', 'west_east_stag'], 'm s-1', np.vstack(tmp[2::varlen]))
+        create3D_var(['PSFC', 'time', 'south_north', 'west_east'], 'Pa', np.vstack(tmp[3::varlen]))
+        create3D_var(['TSK', 'time', 'south_north', 'west_east'], 'K', np.vstack(tmp[4::varlen]))
                                                 
         #amp = dataset.createVariable('M0_ZM', np.float32, ('martian_months', 'bottom_top', 'south_north',))
         
@@ -412,5 +415,5 @@ def init_reduction(filedir):
             print ('Tarring file,', i)            
             tar.add(i, arcname = i.replace(filedir, ''))
             tar.close()
-init_reduction('./../diag.r14p1dustL45')
+init_reduction('./../data_marswrf/diag.r14p1dustL45')
  
