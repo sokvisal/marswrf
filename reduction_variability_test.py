@@ -46,7 +46,7 @@ def load_zm(filename, data, varlist):
     return ls, tmp
 
 
-filedir = './../pw.v.dust/WRFV3/run/'
+filedir = './../model_run/dustL45/'
 filepath = filedir + '/wrfout_d01*'
 print (filepath)
 
@@ -88,7 +88,7 @@ def create4D_var(varnameList, units, data):
     tmp2.units = (units)
     tmp2[:] = data
 
-dataset = Dataset('./dustL45_p0.015.nc', 'w')
+dataset = Dataset('./dustL45_test.nc', 'w')
 
 varlen = varlist.size + 1
 time_dim = np.vstack(tmp[0::varlen]).shape[0]
