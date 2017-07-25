@@ -189,7 +189,36 @@ class reduction:
             print ( 'Saving {} ...'.format(var) )
             ncfile.saveVar(reshapedData, self.varList[i], unitList[i])
         ncfile.close(True)     
+    
+    def auxhist5(self, varList):
+        self.latRange = [0,None]
+        self.lonRange = [0,None]
+        self.varList = varList
+        self.zonalmean = True
+        
+        print(self.dir)
+        
+        ls = []
+        for i, file in enumerate(sorted(glob.glob(self.dir+'/auxhist5*'))):
+            print (file)
+            if not i:
+                ls, tmp = self.loadData(file)
+            else:
+                ls2, tmp2 = self.loadData(file)
+                ls = np.concatenate((ls, ls2))
+                tmp = tmp + tmp2
+        
+        varlen = self.varList.size
+        unitList = self.checkUnit(file)
+        
+        ncfile = createNC('r14p1dustL45_auxhist5.nc', ls)
+        for i, var in enumerate(self.varList):
+            reshapedData = np.vstack(tmp[i::varlen])
+            print ( 'Saving {} ...'.format(var) )
+            ncfile.saveVar(reshapedData, self.varList[i], unitList[i])
+        ncfile.close(True)   
         
 a = reduction('./../diag.r14p1dustL45/')
-a.wrfout(np.array(['T', 'U', 'V']))
+#a.wrfout(np.array(['T', 'U', 'V']))
+a.auxhist5(np.array(['PSFC', 'TSK', 'HGT']))
 #a.auxhist9(np.array(['T_PHY_AM', 'T_PHY_PM', 'TAU_OD2D_AM', 'TAU_OD2D_PM', 'TAU_CL2D_AM', 'TAU_CL2D_PM']))
