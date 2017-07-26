@@ -41,8 +41,8 @@ class createNC:
             create3D_var([self.dataname, 'time', 'south_north', 'west_east'], self.unitname, data)
         if self.dim == 3 and data.shape[1] == 52:
             create3D_var([self.dataname, 'time', 'bottom_top', 'south_north'], self.unitname, data)
-       	if self.dim == 4:
-	    create4D_var([self.dataname, 'time', 'bottom_top', 'south_north', 'west_east'], self.unitname, data)
+        if self.dim == 4:
+            create4D_var([self.dataname, 'time', 'bottom_top', 'south_north', 'west_east'], self.unitname, data)
  
     def close(self, close = True):
         if close:
@@ -183,9 +183,19 @@ class reduction:
         varlen = self.varList.size
         unitList = self.checkUnit(file)
         
-        ncfile = createNC('wetL50_auxhist9.nc', ls)
+        tdiff = (np.vstack(tmp[1::varlen]) - np.vstack(tmp[0::varlen]))*0.5        
+        tavg = (np.vstack(tmp[1::varlen]) + np.vstack(tmp[0::varlen]))*0.5
+        newData = [tdiff.mean(axis=3), tavg.mean(axis=3)]
+        
+        self.varList[:2] = ['T_PHY_DIFF', 'T_PHY_AVG']
+        unitList[:2] = ['Temperature difference at 2pm and 2am', 'Temperature average at 2pm and 2am']
+        
+        ncfile = createNC('test2.nc', ls)
         for i, var in enumerate(self.varList):
-            reshapedData = np.vstack(tmp[i::varlen])
+            if i  in [0,1]:
+                reshapedData = newData[i]
+            else:
+                reshapedData = np.vstack(tmp[i::varlen])
             print ( 'Saving {} ...'.format(var) )
             ncfile.saveVar(reshapedData, self.varList[i], unitList[i])
         ncfile.close(True)     
@@ -218,7 +228,7 @@ class reduction:
             ncfile.saveVar(reshapedData, self.varList[i], unitList[i])
         ncfile.close(True)   
         
-a = reduction('./../pw.v.wet/WRFV3/run/')
+a = reduction('./../diag.r14p1dustL45')#pw.v.wet/WRFV3/run/')
 #a.wrfout(np.array(['T', 'U']))
 #a.auxhist5(np.array(['PSFC', 'TSK', 'HGT']))
 a.auxhist9(np.array(['T_PHY_AM', 'T_PHY_PM', 'TAU_OD2D_AM', 'TAU_OD2D_PM', 'TAU_CL2D_AM', 'TAU_CL2D_PM']))
