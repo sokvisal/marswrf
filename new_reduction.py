@@ -3,8 +3,6 @@ from netCDF4 import Dataset
 import os
 import glob
 import sys
-from tqdm import tqdm
-
 
 class createNC:
     def __init__(self, name, solarLon):
@@ -43,7 +41,9 @@ class createNC:
             create3D_var([self.dataname, 'time', 'south_north', 'west_east'], self.unitname, data)
         if self.dim == 3 and data.shape[1] == 52:
             create3D_var([self.dataname, 'time', 'bottom_top', 'south_north'], self.unitname, data)
-        
+       	if self.dim == 4:
+	    create4D_var([self.dataname, 'time', 'bottom_top', 'south_north', 'west_east'], self.unitname, data)
+ 
     def close(self, close = True):
         if close:
             self.dataset.close()
@@ -139,7 +139,7 @@ class reduction:
         self.zonalmean = True
         
         ls = []
-        for i, file in enumerate(sorted(glob.glob(self.dir+'/wrfout*')[:1])):
+        for i, file in enumerate(sorted(glob.glob(self.dir+'/wrfout*'))):
             print (file)
             if not i:
                 ls, tmp = self.loadData(file)
@@ -155,7 +155,7 @@ class reduction:
         varlen = self.varList.size
         unitList = self.checkUnit(file)
         
-        ncfile = createNC('r14p1dustL45_wrfout_5.nc', ls)
+        ncfile = createNC('wetL50_wrfout.nc', ls)
         for i, var in enumerate(self.varList):
             reshapedData = np.vstack(tmp[i::varlen])
             print ( 'Saving {} ...'.format(var), reshapedData.shape )
@@ -166,7 +166,7 @@ class reduction:
         self.latRange = [0,None]
         self.lonRange = [0,None]
         self.varList = varList
-        self.zonalmean = True
+        self.zonalmean = False
         
         print(self.dir)
         
@@ -183,7 +183,7 @@ class reduction:
         varlen = self.varList.size
         unitList = self.checkUnit(file)
         
-        ncfile = createNC('r14p1dustL45_auxhist9_7.nc', ls)
+        ncfile = createNC('wetL50_auxhist9.nc', ls)
         for i, var in enumerate(self.varList):
             reshapedData = np.vstack(tmp[i::varlen])
             print ( 'Saving {} ...'.format(var) )
@@ -210,15 +210,15 @@ class reduction:
         
         varlen = self.varList.size
         unitList = self.checkUnit(file)
-        
-        ncfile = createNC('r14p1dustL45_auxhist5.nc', ls)
+        print (unitList)
+        ncfile = createNC('wetL50_auxhist5.nc', ls)
         for i, var in enumerate(self.varList):
             reshapedData = np.vstack(tmp[i::varlen])
             print ( 'Saving {} ...'.format(var) )
             ncfile.saveVar(reshapedData, self.varList[i], unitList[i])
         ncfile.close(True)   
         
-a = reduction('./../diag.r14p1dustL45/')
-#a.wrfout(np.array(['T', 'U', 'V']))
-a.auxhist5(np.array(['PSFC', 'TSK', 'HGT']))
-#a.auxhist9(np.array(['T_PHY_AM', 'T_PHY_PM', 'TAU_OD2D_AM', 'TAU_OD2D_PM', 'TAU_CL2D_AM', 'TAU_CL2D_PM']))
+a = reduction('./../pw.v.wet/WRFV3/run/')
+#a.wrfout(np.array(['T', 'U']))
+#a.auxhist5(np.array(['PSFC', 'TSK', 'HGT']))
+a.auxhist9(np.array(['T_PHY_AM', 'T_PHY_PM', 'TAU_OD2D_AM', 'TAU_OD2D_PM', 'TAU_CL2D_AM', 'TAU_CL2D_PM']))
