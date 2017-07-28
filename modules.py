@@ -45,6 +45,8 @@ matplotlib.rcParams['ytick.major.width'] = 1
 matplotlib.rcParams['ytick.minor.size'] = 3
 matplotlib.rcParams['ytick.minor.width'] = 0.7
                    
+matplotlib.rcParams['figure.figsize'] = (7, 3)
+                   
                    
 import cubehelix 
 cb = cubehelix.cmap(startHue=220,endHue=-300,minSat=1,maxSat=2.5,minLight=.3,maxLight=.8,gamma=1.2)
@@ -71,6 +73,22 @@ def martians_month(ls, data):
         temp.append(data[idx].mean(axis=0))
     temp = np.array(temp)
     return temp
+
+def yearly_ls(ls):
+    idx = np.where(ls==360)[0]
+    counter = 1
+    for i in np.arange(idx.size-1):
+        ls[idx[i]:idx[i+1]] += counter*360
+        ls[idx[i]] -= 360
+        counter += 1
+    if idx.size == 1:
+        i = 0
+        ls[idx[i]:] += counter*360
+        ls[idx[i]] -= 360
+    else:
+        ls[idx[i+1]:] += counter*360
+        ls[idx[i+1]] -= 360
+    return ls
 
 def window_stdev(arr, radius):
     #array = arr, radius = half width of window in bins
@@ -139,7 +157,7 @@ def T2km_filter_waven(directory):
     for i, ax in tqdm(enumerate(axes.flat)):
         tst = spect_v(ls, psfc,  1/8., 5., 1.5, 10., wave[i])
 
-        im = ax.contourf(np.linspace(0,360, 223), np.linspace(-90,90,36), tst.T.reshape((36,223,24)).mean(axis=2), np.linspace(0,8,9), extend='both', cmap = cb)
+        im = ax.contourf(np.linspace(0,360, 223), np.linspace(-90,90,36), tst.T.reshape((36,223,24)).mean(axis=2), np.linspace(0,7,8), extend='both', cmap = cb)
         for c in im.collections:
                 c.set_edgecolor("face")
                 
