@@ -32,6 +32,7 @@ class createNC:
             tmp2 =  self.dataset.createVariable(varnameList[0], np.float32, (varnameList[1], varnameList[2], varnameList[3],), zlib=True)
             tmp2.units = (units)
             tmp2[:] = data
+	    print (varnameList, type(data))
         def create4D_var(varnameList, units, data):   
             tmp2 =  self.dataset.createVariable(varnameList[0], np.float32, (varnameList[1], varnameList[2], varnameList[3], varnameList[4],), zlib=True)
             tmp2.units = (units)
@@ -63,7 +64,7 @@ class reduction:
     
     def checkZM(self, data):
         if self.zonalmean and self.dim==4:
-            return data.mean(axis=3)
+	    return data.mean(axis=3)
         if self.zonalmean and self.dim==3:
             return data
         if not self.zonalmean:
@@ -71,23 +72,24 @@ class reduction:
 
     def reff_ice(self, nice, qice, qcore,mu=1.0, rhoi=1000., rhoc=2500.):
         import numpy as np
+	print(np.max(nice))
         qtot = qice+qcore
-        nlow=1e1
-        rho = ones_like(qtot)#
-        reff=np.ma.array(100+zeros_like(qice),mask=nice<nlow)    
+        nlow=1e3
+        rho = np.ones_like(qtot)#
+        reff=np.ma.array(np.nan+np.zeros_like(qice),mask=nice<nlow)    
         m=(nice>0)&(qtot>0)
         rho[m] = (qice[m]*rhoi+qcore[m]*rhoc)/qtot[m]
-        print rho[m].max(), rho[m].min()
-        reff[m] = pow((qtot[m]/nice[m])*(3/(4*pi*rho[m]))*(mu+3)**2/((mu+2)*(mu+1)),1./3)
-        return reff*1e6
+        reff[m] = pow((qtot[m]/nice[m])*(3/(4*np.pi*rho[m]))*(mu+3)**2/((mu+2)*(mu+1)),1./3)
+        print(type(reff))
+	return reff*1e6
     
     def reff_dust(self, ndust, qdust,mu=1.0, rhoc=2500.):
         import numpy as np
         nlow=1e1
-        rho = ones_like(qdust)#
-        reff=np.ma.array(100+zeros_like(qdust),mask=ndust<nlow)    
+        rho = np.ones_like(qdust)#
+        reff=np.ma.array(100+np.zeros_like(qdust),mask=ndust<nlow)    
         m=(ndust>0)&(qdust>0)
-        reff[m] = pow((qdust[m]/ndust[m])*(3/(4*pi*rhoc))*(mu+3)**2/((mu+2)*(mu+1)),1./3)
+        reff[m] = pow((qdust[m]/ndust[m])*(3/(4*np.pi*rhoc))*(mu+3)**2/((mu+2)*(mu+1)),1./3)
         return reff*1e6
 
     def loadData(self, file):
@@ -107,8 +109,7 @@ class reduction:
             self.dim = temporary.ndim
     
             lat0 = self.latRange[0]
-            lat1 = self.latRange[1]
-            
+            lat1 = self.latRange[1] 
             lon0 = self.lonRange[0]
             lon1 = self.lonRange[1]
             
@@ -137,10 +138,13 @@ class reduction:
                 r_ice = self.reff_ice(qnice, qice, trc_ic)
                 del qnice, qice, trc_ic
                 
+
+		tmp2 = self.checkZM(r_ice)
+		print type(tmp2)
                 tmp.append( self.checkZM(r_ice) )
             elif var == 'REFF_DUST':
-                qndust = Data.variables['QNDUST'][:]
-                qdust = Data.variables['QDUST'][:]
+                qndust = Data.variables['NDUST'][:]
+                qdust = Data.variables['TRC01'][:]
                 
                 r_dust = self.reff_dust(qndust, qdust)
                 del qndust, qdust
@@ -295,8 +299,8 @@ class reduction:
             ncfile.saveVar(reshapedData, self.varList[i], unitList[i])
         ncfile.close(True)  
         
-a = reduction('./../pw.v.wet/WRFV3/run/wetL50')
-a.wrfout(np.array(['T', 'T1_5', 'NLIF1', 'QV_COLUMN', 'QI_COLUMN', 'REFF_DUST', 'REFF_ICE']))
-a.auxhist5(np.array(['PSFC', 'TSK', 'HGT']))
-a.auxhist9(np.array(['T_PHY_AM', 'T_PHY_PM', 'TAU_OD2D_AM', 'TAU_OD2D_PM', 'TAU_CL2D_AM', 'TAU_CL2D_PM']))
+a = reduction('./../pw.v.wet/WRFV3/run/wetL50m8')
+a.wrfout(np.array(['T', 'T1_5', 'NLIF1', 'QV_COLUMN', 'QI_COLUMN', 'REFF_ICE', 'QICE', 'QNICE', 'TRC_IC']))
+#a.auxhist5(np.array(['PSFC', 'TSK', 'HGT']))
+#a.auxhist9(np.array(['T_PHY_AM', 'T_PHY_PM', 'TAU_OD2D_AM', 'TAU_OD2D_PM', 'TAU_CL2D_AM', 'TAU_CL2D_PM']))
 #a.auxhist8(np.array(['TRC_IC', 'DUSTN_SED', 'DUSTQ_SED', 'ICEQ_SED', 'ICEN_SED']))
