@@ -50,7 +50,9 @@ matplotlib.rcParams['figure.figsize'] = (7, 3)
                    
 import cubehelix 
 cb = cubehelix.cmap(startHue=220,endHue=-300,minSat=1,maxSat=2.5,minLight=.3,maxLight=.8,gamma=1.2)
+cb3 = cubehelix.cmap(startHue=240,endHue=-300,minSat=1,maxSat=2.5,minLight=.3,maxLight=.8,gamma=.9)
 cb2 = cubehelix.cmap(reverse=True, start=0., rot=0.5)
+#cb2 = cubehelix.cmap(rot=1, reverse=True)
 
 def martians_year(ls, data):
     #### only looking at "second year"
@@ -171,7 +173,7 @@ def T2km_filter_waven(directory):
     fig.tight_layout()
     fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.6, orientation='vertical', pad=0.01)
     
-def zonal_plt_monthly(ydata, ls, data, title, level=12, norm=False, cmap=None):
+def zonal_plt_monthly(ydata, ls, data, title, level=9, norm=False, cmap=None):
     cmap=cmap or "viridis"
     
     fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(14,12))
@@ -187,9 +189,9 @@ def zonal_plt_monthly(ydata, ls, data, title, level=12, norm=False, cmap=None):
         d = data[i][6:]
 
         if norm:
-            im = ax.contourf(lat, y, d, levels=level, cmap=cmap, norm=SymLogNorm(linthresh=1e5,vmin=np.min(d), vmax=np.max(d)))
-            if not np.isnan(d).any():
-                ax.contour(lat, y, d, levels=level, linewidths=0.5, colors='k', norm=SymLogNorm(linthresh=1e5,vmin=np.min(d), vmax=np.max(d)))
+            im = ax.contourf(lat, y, d, levels=level, cmap=cmap, extend='both', norm=SymLogNorm(linthresh=np.abs(np.min(level)),vmin=np.min(d), vmax=np.max(d)))
+#            if not np.isnan(d).any():
+#                ax.contour(lat, y, d, levels=level, linewidths=0.5, colors='k', norm=SymLogNorm(linthresh=np.min(level),vmin=np.min(d), vmax=np.max(d)))
                 
             ax.xaxis.set_minor_locator(AutoMinorLocator(4))
         else: 
@@ -210,7 +212,7 @@ def zonal_plt_monthly(ydata, ls, data, title, level=12, norm=False, cmap=None):
         
 #        print ('Saving 1st cool shit')
     fig.tight_layout()
-    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.05)
+    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.05)#, format='%.1e')
 
 def bandpass_filter(filedir):
     
