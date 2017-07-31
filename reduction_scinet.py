@@ -68,7 +68,28 @@ class reduction:
             return data
         if not self.zonalmean:
             return data
-        
+
+    def reff_ice(self, nice, qice, qcore,mu=1.0, rhoi=1000., rhoc=2500.):
+        import numpy as np
+        qtot = qice+qcore
+        nlow=1e1
+        rho = ones_like(qtot)#
+        reff=np.ma.array(100+zeros_like(qice),mask=nice<nlow)    
+        m=(nice>0)&(qtot>0)
+        rho[m] = (qice[m]*rhoi+qcore[m]*rhoc)/qtot[m]
+        print rho[m].max(), rho[m].min()
+        reff[m] = pow((qtot[m]/nice[m])*(3/(4*pi*rho[m]))*(mu+3)**2/((mu+2)*(mu+1)),1./3)
+        return reff*1e6
+    
+    def reff_dust(self, ndust, qdust,mu=1.0, rhoc=2500.):
+        import numpy as np
+        nlow=1e1
+        rho = ones_like(qdust)#
+        reff=np.ma.array(100+zeros_like(qdust),mask=ndust<nlow)    
+        m=(ndust>0)&(qdust>0)
+        reff[m] = pow((qdust[m]/ndust[m])*(3/(4*pi*rhoc))*(mu+3)**2/((mu+2)*(mu+1)),1./3)
+        return reff*1e6
+
     def loadData(self, file):
         t0 = 300. #data.variables['T00'][:] # base temperature
         p0 = 610. #data.variables['P00'][:] # base pressure
@@ -108,6 +129,23 @@ class reduction:
                 phb = Data.variables['PHB'][:]
                 
                 tmp.append( self.checkZM(ph+phb) )
+            elif var == 'REFF_ICE':
+                qnice = Data.variables['QNICE'][:]
+                qice = Data.variables['QICE'][:]
+                trc_ic = Data.variables['TRC_IC'][:]
+                
+                r_ice = self.reff_ice(qnice, qice, trc_ic)
+                del qnice, qice, trc_ic
+                
+                tmp.append( self.checkZM(r_ice) )
+            elif var == 'REFF_DUST':
+                qndust = Data.variables['QNDUST'][:]
+                qdust = Data.variables['QDUST'][:]
+                
+                r_dust = self.reff_dust(qndust, qdust)
+                del qndust, qdust
+                
+                tmp.append( self.checkZM(r_dust) )
             elif self.dim == 3:
                 data = Data.variables[var][:][:,lat0:lat1,lon0:lon1]
                 tmp.append( self.checkZM(data) )
@@ -258,7 +296,7 @@ class reduction:
         ncfile.close(True)  
         
 a = reduction('./../pw.v.wet/WRFV3/run/wetL50')
-a.wrfout(np.array(['T', 'T1_5', 'NLIF1', 'QV_COLUMN', 'QI_COLUMN']))
+a.wrfout(np.array(['T', 'T1_5', 'NLIF1', 'QV_COLUMN', 'QI_COLUMN', 'REFF_DUST', 'REFF_ICE']))
 a.auxhist5(np.array(['PSFC', 'TSK', 'HGT']))
 a.auxhist9(np.array(['T_PHY_AM', 'T_PHY_PM', 'TAU_OD2D_AM', 'TAU_OD2D_PM', 'TAU_CL2D_AM', 'TAU_CL2D_PM']))
-#a.auxhist8(np.array(['TRC_IC', 'DUSTN_SED', 'DUSTQ_SED', 'ICEQ_SED', 'ICEN_SED', 'REFF_DUST', 'REFF_ICE']))
+#a.auxhist8(np.array(['TRC_IC', 'DUSTN_SED', 'DUSTQ_SED', 'ICEQ_SED', 'ICEN_SED']))
