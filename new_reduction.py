@@ -13,7 +13,7 @@ class createNC:
         
         solar_long = self.dataset.createDimension('time', solarLon.size)
         pressure = self.dataset.createDimension('bottom_top', 52)
-        latitude = self.dataset.createDimension('south_north', 36)
+        latitude = self.dataset.createDimension('south_north', 14)
         longitude = self.dataset.createDimension('west_east', 72)
         
         ls = self.dataset.createVariable('LS', np.float32, ('time',))
@@ -37,7 +37,7 @@ class createNC:
             tmp2.units = (units)
             tmp2[:] = data
                 
-        if self.dim == 3 and data.shape[1] == 36:
+        if self.dim == 3 and data.shape[1] == 14:
             create3D_var([self.dataname, 'time', 'south_north', 'west_east'], self.unitname, data)
         if self.dim == 3 and data.shape[1] == 52:
             create3D_var([self.dataname, 'time', 'bottom_top', 'south_north'], self.unitname, data)
@@ -51,6 +51,7 @@ class createNC:
 class reduction:
     def __init__(self, directory):
         self.dir = directory
+        self.name = directory
         
     def checkUnit(self, file):
         Data = Dataset(file, 'r')
@@ -133,10 +134,10 @@ class reduction:
                 tmp = tmp + tmp2
                 
     def wrfout(self, varList):
-        self.latRange = [0,None]
+        self.latRange = [22,None]
         self.lonRange = [0,None]
         self.varList = varList
-        self.zonalmean = True
+        self.zonalmean = False
         
         ls = []
         for i, file in enumerate(sorted(glob.glob(self.dir+'/wrfout*'))):
@@ -155,7 +156,7 @@ class reduction:
         varlen = self.varList.size
         unitList = self.checkUnit(file)
         
-        ncfile = createNC('wetL50_wrfout.nc', ls)
+        ncfile = createNC('r14p5_partial.nc', ls)
         for i, var in enumerate(self.varList):
             reshapedData = np.vstack(tmp[i::varlen])
             print ( 'Saving {} ...'.format(var), reshapedData.shape )
@@ -228,7 +229,7 @@ class reduction:
             ncfile.saveVar(reshapedData, self.varList[i], unitList[i])
         ncfile.close(True)   
         
-a = reduction('./../diag.r14p1dustL45')#pw.v.wet/WRFV3/run/')
-#a.wrfout(np.array(['T', 'U']))
+a = reduction('D:/diag.r14p5/')#pw.v.wet/WRFV3/run/')
+a.wrfout(np.array(['T', 'QICE', 'QVAPOR', 'TRC01', 'T1_5', 'QI_COLUMN', 'QV_COLUMN']))
 #a.auxhist5(np.array(['PSFC', 'TSK', 'HGT']))
-a.auxhist9(np.array(['T_PHY_AM', 'T_PHY_PM', 'TAU_OD2D_AM', 'TAU_OD2D_PM', 'TAU_CL2D_AM', 'TAU_CL2D_PM']))
+#a.auxhist9(np.array(['T_PHY_AM', 'T_PHY_PM', 'TAU_OD2D_AM', 'TAU_OD2D_PM', 'TAU_CL2D_AM', 'TAU_CL2D_PM']))

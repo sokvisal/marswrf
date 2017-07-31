@@ -48,48 +48,48 @@ def load_zm(filename, data, varlist):
             tmp.append(u)
         else: 
             tmp2 = data.variables[var][:]
-            tmp.append(tmp2[:,:,16:20,60:64])
+            tmp.append(tmp2[:])
     return ls, tmp
 
-#def load_zm(filename, data, varlist):
-#    t0 = 300. #data.variables['T00'][:] # base temperature
-#    p0 = 610. #data.variables['P00'][:] # base pressure
-#    r_d = 191.8366
-#    cp = 767.3466
-#    g = 3.727
-#    gamma = r_d/cp
-#    
-#    ls = data.variables['L_S'][:] # solar long
-#    
-#    tmp = []
-#    for var in varlist:
-#        if var == 'T':
-#            t = data.variables['T'][:]#[:,:,16:] # perturbation potential temp
-#            
-#            p = data.variables['P'][:]#[:,:,16:] # perturbation pressure
-#            pb = data.variables['PB'][:]#[:,:,16:] # base state pressure
-#            
-#            pot_temp = t + t0 # potential temperature
-#            p = p + pb # pressure
-#            del t, pb
-#            
-#            tmp.append((pot_temp*(p/p0)**gamma)) # temperature
-#            tmp.append(p.mean(axis=3))
-#        elif var == 'PH':
-#            ph = data.variables['PH'][:][:,:,16:].mean(axis = 3)
-#            phb = data.variables['PHB'][:][:,:,16:].mean(axis = 3)
-#            
-#            tmp.append((ph+phb)/(1000*g))
-#        elif var == 'U':
-#            u = data.variables['U'][:]
-#            tmp.append(u[:,:,16:20,61:65])
-#        elif var == 'PSFC':
-#            u = data.variables['PSFC'][:][:,16:20,60:64]
-#            tmp.append(u)
-#        else: 
-#            tmp2 = data.variables[var][:][:,:,16:]
-#            tmp.append(tmp2)
-#    return ls, tmp
+def load_zm(filename, data, varlist):
+    t0 = 300. #data.variables['T00'][:] # base temperature
+    p0 = 610. #data.variables['P00'][:] # base pressure
+    r_d = 191.8366
+    cp = 767.3466
+    g = 3.727
+    gamma = r_d/cp
+    
+    ls = data.variables['L_S'][:] # solar long
+    
+    tmp = []
+    for var in varlist:
+        if var == 'T':
+            t = data.variables['T'][:]#[:,:,16:] # perturbation potential temp
+            
+            p = data.variables['P'][:]#[:,:,16:] # perturbation pressure
+            pb = data.variables['PB'][:]#[:,:,16:] # base state pressure
+            
+            pot_temp = t + t0 # potential temperature
+            p = p + pb # pressure
+            del t, pb
+            
+            tmp.append((pot_temp*(p/p0)**gamma)) # temperature
+            tmp.append(p.mean(axis=3))
+        elif var == 'PH':
+            ph = data.variables['PH'][:][:,:,16:20].mean(axis = 3)
+            phb = data.variables['PHB'][:][:,:,16:20].mean(axis = 3)
+            
+            tmp.append((ph+phb)/(1000*g))
+        elif var == 'U':
+            u = data.variables['U'][:]
+            tmp.append(u[:,:,16:20,61:65])
+        elif var == 'PSFC':
+            u = data.variables['PSFC'][:][:,16:20,60:64]
+            tmp.append(u)
+        else: 
+            tmp2 = data.variables[var][:][:,:,16:20]
+            tmp.append(tmp2)
+    return ls, tmp
 
 def load_misc(filename, data, var_name):
     var = var_name + '_AM'
@@ -142,7 +142,7 @@ def init_reduction(filedir):
         if not os.path.exists(filedir+'/reduction'): 
             os.mkdir(filedir+'/reduction')
         	#    print filedir 
-        varlist = np.array(['T']) #, 'PH', 'TAU_CL', 'TAU_OD'
+        varlist = np.array(['T','PH', 'TAU_CL', 'TAU_OD'])
         for num, i in enumerate(tqdm(sorted(glob.glob(filepath)[:]))):
             if num == 0:
                 nc_file = i
@@ -168,7 +168,7 @@ def init_reduction(filedir):
             tmp2.units = (units)
             tmp2[:] = data
         
-        dataset = Dataset('./test2.nc', 'w')
+        dataset = Dataset('./r14p1dustL45_full_TP.nc', 'w')
         
         solar_long = dataset.createDimension('time', None)
         pressure = dataset.createDimension('bottom_top', None)
@@ -185,9 +185,9 @@ def init_reduction(filedir):
         
         create4D_var(['T', 'time', 'bottom_top', 'south_north', 'west_east'], 'K', np.vstack(tmp[0::varlen]))
         create3D_var(['P', 'time', 'bottom_top', 'south_north'], 'Pa', np.vstack(tmp[1::varlen]))
-        #create3D_var(['PH', 'time', 'bottom_top_stag', 'south_north'], 'km', np.vstack(tmp[2::varlen]))
-        #create4D_var(['TAU_CL', 'time', 'bottom_top', 'south_north', 'west_east'], 'unitless', np.vstack(tmp[3::varlen]))
-        #create4D_var(['TAU_OD', 'time', 'bottom_top', 'south_north', 'west_east'], 'unitless', np.vstack(tmp[4::varlen]))
+        create3D_var(['PH', 'time', 'bottom_top_stag', 'south_north'], 'km', np.vstack(tmp[2::varlen]))
+        create4D_var(['TAU_CL', 'time', 'bottom_top', 'south_north', 'west_east'], 'unitless', np.vstack(tmp[3::varlen]))
+        create4D_var(['TAU_OD', 'time', 'bottom_top', 'south_north', 'west_east'], 'unitless', np.vstack(tmp[4::varlen]))
 #        create4D_var(['U', 'time', 'bottom_top', 'south_north', 'west_east_stag'], 'm s-1', tmp[2])
 #        create3D_var(['PSFC', 'time', 'south_north', 'west_east_stag'], 'Pa', tmp[3])
                                                 
@@ -395,8 +395,8 @@ def init_reduction(filedir):
         long.units = ('Degree')
         long_u.units = ('Degree')
         ls[:] = lsd
-        lat[:] = np.array([-7.71428571, -2.57142857,  2.57142857,  7.71428571])
-        long[:] = np.array([ 124.22535211,  129.29577465,  134.36619718,  139.43661972])
+#        lat[:] = np.array([-7.71428571, -2.57142857,  2.57142857,  7.71428571])
+#        long[:] = np.array([ 124.22535211,  129.29577465,  134.36619718,  139.43661972])
         long_u[:] = np.array([ 125.,  130.,  135., 140.])
         
         dataset.close()
@@ -415,5 +415,5 @@ def init_reduction(filedir):
             print ('Tarring file,', i)            
             tar.add(i, arcname = i.replace(filedir, ''))
             tar.close()
-init_reduction('./../data_marswrf/diag.r14p1dustL45')
+init_reduction('./../diag.r14p1dustL45')
  
