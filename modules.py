@@ -26,7 +26,7 @@ matplotlib.rcParams['axes.linewidth'] = 1
 matplotlib.rcParams['font.size'] = 7
 matplotlib.rcParams['legend.frameon'] = False
 
-matplotlib.rcParams['figure.dpi'] = 200
+matplotlib.rcParams['figure.dpi'] = 300
 matplotlib.rcParams['axes.facecolor'] = '#F8F8FF'
 matplotlib.rcParams['axes.grid'] = True
 matplotlib.rcParams['axes.axisbelow'] = True
@@ -189,7 +189,7 @@ def zonal_plt_monthly(ydata, ls, data, title, level=9, norm=False, cmap=None):
         d = data[i][6:]
 
         if norm:
-            im = ax.contourf(lat, y, d, levels=level, cmap=cmap, extend='both', norm=SymLogNorm(linthresh=np.abs(np.min(level)),vmin=np.min(d), vmax=np.max(d)))
+            im = ax.contourf(lat, y, d, levels=level, cmap=cmap, extend='max', norm=SymLogNorm(linthresh=np.abs(np.min(level)),vmin=np.min(d), vmax=np.max(d)))
 #            if not np.isnan(d).any():
 #                ax.contour(lat, y, d, levels=level, linewidths=0.5, colors='k', norm=SymLogNorm(linthresh=np.min(level),vmin=np.min(d), vmax=np.max(d)))
                 
@@ -212,7 +212,7 @@ def zonal_plt_monthly(ydata, ls, data, title, level=9, norm=False, cmap=None):
         
 #        print ('Saving 1st cool shit')
     fig.tight_layout()
-    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.05)#, format='%.1e')
+    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.05, format='%.1e')
 
 def bandpass_filter(filedir):
     
