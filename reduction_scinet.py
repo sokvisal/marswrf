@@ -71,24 +71,23 @@ class reduction:
             return data
 
     def reff_ice(self, nice, qice, qcore,mu=1.0, rhoi=1000., rhoc=2500.):
-        import numpy as np
-	print(np.max(nice))
         qtot = qice+qcore
-        nlow=1e3
+        nlow=1e2
+        
         rho = np.ones_like(qtot)#
-        reff=np.ma.array(np.nan+np.zeros_like(qice),mask=nice<nlow)    
-        m=(nice>0)&(qtot>0)
+        m = (nice>nlow)&(qtot>0)
+        reff = np.ma.array(100.0e-6+np.zeros_like(qice),mask=~m)    
+
         rho[m] = (qice[m]*rhoi+qcore[m]*rhoc)/qtot[m]
         reff[m] = pow((qtot[m]/nice[m])*(3/(4*np.pi*rho[m]))*(mu+3)**2/((mu+2)*(mu+1)),1./3)
-        print(type(reff))
-	return reff*1e6
+        return reff*1e6
     
     def reff_dust(self, ndust, qdust,mu=1.0, rhoc=2500.):
         import numpy as np
-        nlow=1e1
-        rho = np.ones_like(qdust)#
-        reff=np.ma.array(100+np.zeros_like(qdust),mask=ndust<nlow)    
-        m=(ndust>0)&(qdust>0)
+        nlow=1e2
+        rho = np.ones_like(qtot)#
+        m = (nice>nlow)&(qtot>0)
+        reff = np.ma.array(100.0e-6+np.zeros_like(qice),mask=~m)    
         reff[m] = pow((qdust[m]/ndust[m])*(3/(4*np.pi*rhoc))*(mu+3)**2/((mu+2)*(mu+1)),1./3)
         return reff*1e6
 
