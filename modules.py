@@ -202,7 +202,7 @@ def zonal_plt_monthly(ydata, ls, data, title, level=9, norm=False, cmap=None):
 #                 ax.contour(lat, y, d, level, linewidths=0.5, colors='k', extend='both')
         
         ax.xaxis.set_minor_locator(AutoMinorLocator(5))
-        ax.set_title(r'{} LS {}-{}'.format((title), (i)*30, (i+1)*30))
+        ax.set_title(r'{} LS {}-{}'.format((title), (i)*10+180, (i+1)*10+180))
         if i in [0,4,8]: ax.set_ylabel('Pressure [Pa]')
         if i in [8,9,10,11]: ax.set_xlabel('Latitude [$^\circ$]')
         ax.set_yscale('log')
