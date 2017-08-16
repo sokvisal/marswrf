@@ -10,6 +10,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
 from scipy.ndimage.filters import uniform_filter1d
 from scipy.signal import butter, lfilter
+import sys
 
 from matplotlib.colors import SymLogNorm
 
@@ -54,6 +55,7 @@ cb3 = cubehelix.cmap(startHue=240,endHue=-300,minSat=1,maxSat=2.5,minLight=.3,ma
 cb2 = cubehelix.cmap(reverse=True, start=0., rot=0.5)
 #cb2 = cubehelix.cmap(rot=1, reverse=True)
 
+# selecting only a year worth of 
 def martians_year(ls, data):
     #### only looking at "second year"
     idx = np.where(ls==360)[0]
@@ -68,29 +70,56 @@ def martians_year(ls, data):
         idx2 = idx[2]
         return data[idx1:idx2]
 
-def martians_month(ls, data):
+# divide into bins of #ofbinning
+def martians_month(ls, data, binning=13):
+    period = 360/binning
     temp = []
-    for i in np.arange(0, 12):
-        idx = np.where((ls>i*30)&(ls<(i+1)*30))[0]
+    for i in np.arange(0, binning-1):
+        idx = np.where((ls>i*period)&(ls<(i+1)*period))[0]
         temp.append(data[idx].mean(axis=0))
     temp = np.array(temp)
     return temp
 
+# calculate the reff of ice
+def reff_ice(nice, qice, qcore,mu=1., rhoi=1000., rhoc=2500.):
+    import numpy as np
+    qtot = qice+qcore
+    nlow=1e4
+    rho = ones_like(qtot)#
+    m=(nice>nlow)&(qtot>0)
+    reff=np.ma.array(100.0e-6+zeros_like(qice),mask=~m)    
+
+    rho[m] = (qice[m]*rhoi+qcore[m]*rhoc)/qtot[m]
+    reff[m] = pow((qtot[m]/nice[m])*(3/(4*pi*rho[m]))*(mu+3)**2/((mu+2)*(mu+1)),1./3)
+    return reff*1e6
+
+# calculate the reff of dust
+def reff_dust(ndust, qdust,mu=1., rhoc=2500.):
+    import numpy as np
+    nlow=1e4
+    rho = ones_like(qdust)#
+    m=(ndust>nlow)&(qdust>0)
+    reff=np.ma.array(100e-6+zeros_like(qdust),mask=~m)    
+    reff[m] = pow((qdust[m]/ndust[m])*(3/(4*pi*rhoc))*(mu+3)**2/((mu+2)*(mu+1)),1./3)
+    return reff*1e6
+
+# add multiple of 360 to progressive year
 def yearly_ls(ls):
-    idx = np.where(ls==360)[0]
+    new_ls = np.copy(ls)
+    idx = np.where(new_ls==360)[0]
     counter = 1
     for i in np.arange(idx.size-1):
-        ls[idx[i]:idx[i+1]] += counter*360
-        ls[idx[i]] -= 360
+        new_ls[idx[i]:idx[i+1]] += counter*360
+        new_ls[idx[i]] -= 360
         counter += 1
     if idx.size == 1:
         i = 0
-        ls[idx[i]:] += counter*360
-        ls[idx[i]] -= 360
+        new_ls[idx[i]:] += counter*360
+        new_ls[idx[i]] -= 360
     else:
-        ls[idx[i+1]:] += counter*360
-        ls[idx[i+1]] -= 360
-    return ls
+        new_ls[idx[i+1]:] += counter*360
+        new_ls[idx[i+1]] -= 360
+    return new_ls
 
 def window_stdev(arr, radius):
     #array = arr, radius = half width of window in bins
@@ -113,19 +142,24 @@ def butter_bandpass_filter(data, lowcut, highcut, fs, order=5,axis=0):
     y = lfilter(b, a, data,axis=axis)
     return y
 
+# fft filter
 def spect_v(ls, data, tstep, lonstep, lowcut, highcut, wave):
+    # defining range of period to look at
     lowcut = 1./lowcut
     highcut = 1./highcut
-        
+    
+    # fft and fftfreq
     fftdata = np.fft.fftn(data, axes=[0,2])
     freq = np.fft.fftfreq(fftdata.shape[0], tstep)
     waven = np.fft.fftfreq(fftdata.shape[2], lonstep)*360
     
+    # filtering for the idx of the period that we don't want
     idx1 = np.where((abs(freq)>lowcut)|(abs(freq)<highcut))[0]
 #     print (idx1, waven)
     
-#     set everything that satisfy condition as zero, ie only filtering storm system
+    # set everything that satisfy condition as zero, ie only filtering storm system
     fftdata[idx1] = 0
+    # check if there is a waven condition
     if wave == 0:
         wave1_idx= np.where(((waven)!=wave))[0]
         fftdata[:,:,wave1_idx] = 0
@@ -142,23 +176,30 @@ def spect_v(ls, data, tstep, lonstep, lowcut, highcut, wave):
     temp = filtered.mean(axis=2)
     return np.sqrt(temp)
 
+# fft filter for psfc or surface skin temperature
 def T2km_filter_waven(directory):
     
+    # load data
     filedir = directory+'_auxhist5.nc'
     data = Dataset(filedir,'r')
     ls = data.variables['LS'][:]
     psfc = data.variables['TSK'][:]
     data.close()
 
+    # defining which wavenumber to look at, if none, we don't filter the wavenumber
     wave = [None,1,2,3]
+    # takin the first year
     psfc = martians_year(ls, psfc)
     ls = martians_year(ls, ls)
-
-    title = directory.replace('./../marswrf/test_data/reduction_diag.','')
+    
+    # title name
+    title = directory.replace('./data/','')
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(10,6), sharex=True)
     for i, ax in tqdm(enumerate(axes.flat)):
+        # calculate fft filter giving the freq and waven
         tst = spect_v(ls, psfc,  1/8., 5., 1.5, 10., wave[i])
-
+        
+        # plot
         im = ax.contourf(np.linspace(0,360, 223), np.linspace(-90,90,36), tst.T.reshape((36,223,24)).mean(axis=2), np.linspace(0,7,8), extend='both', cmap = cb)
         for c in im.collections:
                 c.set_edgecolor("face")
@@ -189,7 +230,10 @@ def zonal_plt_monthly(ydata, ls, data, title, level=9, norm=False, cmap=None):
         d = data[i][6:]
 
         if norm:
-            im = ax.contourf(lat, y, d, levels=level, cmap=cmap, extend='max', norm=SymLogNorm(linthresh=np.abs(np.min(level)),vmin=np.min(d), vmax=np.max(d)))
+            from matplotlib.colors import LogNorm
+            
+            im = ax.contourf(lat, y, d, levels=level, cmap=cmap, norm=LogNorm())
+#            im = ax.contourf(lat, y, d, levels=level, cmap=cmap, norm=SymLogNorm(linthresh=np.abs(np.min(level)),vmin=np.min(d), vmax=np.max(d)))
 #            if not np.isnan(d).any():
 #                ax.contour(lat, y, d, levels=level, linewidths=0.5, colors='k', norm=SymLogNorm(linthresh=np.min(level),vmin=np.min(d), vmax=np.max(d)))
                 
@@ -202,7 +246,7 @@ def zonal_plt_monthly(ydata, ls, data, title, level=9, norm=False, cmap=None):
 #                 ax.contour(lat, y, d, level, linewidths=0.5, colors='k', extend='both')
         
         ax.xaxis.set_minor_locator(AutoMinorLocator(5))
-        ax.set_title(r'{} LS {}-{}'.format((title), (i)*10+180, (i+1)*10+180))
+        ax.set_title(r'{} LS {}-{}'.format((title), (i)*ls[1]+ls[0], (i+1)*ls[1]+ls[0]))
         if i in [0,4,8]: ax.set_ylabel('Pressure [Pa]')
         if i in [8,9,10,11]: ax.set_xlabel('Latitude [$^\circ$]')
         ax.set_yscale('log')
@@ -213,6 +257,7 @@ def zonal_plt_monthly(ydata, ls, data, title, level=9, norm=False, cmap=None):
 #        print ('Saving 1st cool shit')
     fig.tight_layout()
     fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.3, orientation='horizontal', pad=0.05, format='%.1e')
+    
 
 def bandpass_filter(filedir):
     
